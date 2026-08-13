@@ -1,9 +1,9 @@
-import React, { useMemo } from "react";
-import { ItemPill, PriorityBadge } from "./shared";
+import React, { useMemo, useState } from "react";
+import { ItemPill, TaskDetailCard } from "./shared";
 import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG, INK } from "../lib/constants";
 import { toISO, addDays, startOfWeek, buildMonthGrid, WEEKDAY_LABELS, parseTime, formatHour } from "../lib/dateUtils";
 
-function MonthGrid({ refDate, itemsByDate }) {
+function MonthGrid({ refDate, itemsByDate, interact }) {
   const weeks = buildMonthGrid(refDate);
   const month = refDate.getMonth();
   return (
@@ -25,7 +25,16 @@ function MonthGrid({ refDate, itemsByDate }) {
               style={{ minHeight: 92, background: outside ? "#FAFAF8" : "#fff", border: "1px solid #EEEBE4" }}
             >
               <div className="text-xs mb-1" style={{ color: outside ? "#B7B2A6" : MUTED }}>{dt.getDate()}</div>
-              {dayItems.slice(0, 3).map((it) => <ItemPill key={it.id} item={it} />)}
+              {dayItems.slice(0, 3).map((it) => (
+                <ItemPill
+                  key={it.id}
+                  item={it}
+                  onClick={() => interact.click(it)}
+                  onMouseEnter={(e) => interact.enter(it, e)}
+                  onMouseMove={interact.move}
+                  onMouseLeave={interact.leave}
+                />
+              ))}
               {dayItems.length > 3 && (
                 <div className="text-xs" style={{ color: MUTED }}>+{dayItems.length - 3} more</div>
               )}
@@ -37,7 +46,7 @@ function MonthGrid({ refDate, itemsByDate }) {
   );
 }
 
-function WeekGrid({ refDate, itemsByDate }) {
+function WeekGrid({ refDate, itemsByDate, interact }) {
   const start = startOfWeek(refDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   return (
@@ -48,7 +57,16 @@ function WeekGrid({ refDate, itemsByDate }) {
         return (
           <div key={i} className="rounded-lg p-2" style={{ minHeight: 160, border: "1px solid #EEEBE4" }}>
             <div className="text-xs font-medium mb-2" style={{ color: MUTED }}>{WEEKDAY_LABELS[i]} {dt.getDate()}</div>
-            {dayItems.map((it) => <ItemPill key={it.id} item={it} />)}
+            {dayItems.map((it) => (
+              <ItemPill
+                key={it.id}
+                item={it}
+                onClick={() => interact.click(it)}
+                onMouseEnter={(e) => interact.enter(it, e)}
+                onMouseMove={interact.move}
+                onMouseLeave={interact.leave}
+              />
+            ))}
             {dayItems.length === 0 && <div className="text-xs" style={{ color: "#C8C3B8" }}>—</div>}
           </div>
         );
@@ -61,16 +79,17 @@ const HOUR_HEIGHT = 56; // px per hour row
 const GUTTER = 56; // px width of the left time-label column
 
 // An hour-by-hour timeline for a single day. Items with a start_time are placed
-// on the grid at their hour/minute; items without one appear in an "All day /
-// untimed" strip above the timeline. When several timed items share the same
-// hour they're laid out side by side so none is hidden.
-function DayTimeline({ refDate, itemsByDate }) {
+// on the grid at their hour/minute (earliest first); items without one appear
+// in an "All day / untimed" strip above the timeline.
+function DayTimeline({ refDate, itemsByDate, interact }) {
   const iso = toISO(refDate);
   const dayItems = itemsByDate[iso] || [];
 
   const timed = [];
   const untimed = [];
   dayItems.forEach((it) => (parseTime(it.start_time) ? timed : untimed).push(it));
+  // Sort timed items chronologically by start time (earliest first).
+  timed.sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
 
   // Visible hour window: default 7:00–21:00, widened to include any timed item.
   let startHour = 7;
@@ -92,9 +111,6 @@ function DayTimeline({ refDate, itemsByDate }) {
     const { h } = parseTime(it.start_time);
     (byHour[h] = byHour[h] || []).push(it);
   });
-  Object.values(byHour).forEach((arr) =>
-    arr.sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""))
-  );
 
   // "Now" indicator, only when viewing today.
   const now = new Date();
@@ -117,7 +133,13 @@ function DayTimeline({ refDate, itemsByDate }) {
               .sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority))
               .map((it) => (
                 <div key={`${it.kind}-${it.id}`} style={{ maxWidth: 220 }}>
-                  <ItemPill item={it} />
+                  <ItemPill
+                    item={it}
+                    onClick={() => interact.click(it)}
+                    onMouseEnter={(e) => interact.enter(it, e)}
+                    onMouseMove={interact.move}
+                    onMouseLeave={interact.leave}
+                  />
                 </div>
               ))}
           </div>
@@ -156,7 +178,10 @@ function DayTimeline({ refDate, itemsByDate }) {
           return (
             <div
               key={`${it.kind}-${it.id}`}
-              title={`${it.title} — ${segName(it.segment)} · ${it.priority} · ${it.status || "Not Started"} · ${it.hours}h${it.project_name ? ` · ${it.project_name}` : ""}`}
+              onClick={() => interact.click(it)}
+              onMouseEnter={(e) => interact.enter(it, e)}
+              onMouseMove={interact.move}
+              onMouseLeave={interact.leave}
               style={{
                 position: "absolute",
                 top,
@@ -169,6 +194,7 @@ function DayTimeline({ refDate, itemsByDate }) {
                 padding: "4px 6px",
                 overflow: "hidden",
                 opacity: done ? 0.6 : 1,
+                cursor: "pointer",
                 zIndex: 2,
               }}
             >
@@ -186,7 +212,19 @@ function DayTimeline({ refDate, itemsByDate }) {
   );
 }
 
-export default function CalendarView({ items, granularity, setGranularity, refDate, setRefDate }) {
+export default function CalendarView({ items, granularity, setGranularity, refDate, setRefDate, onSelectItem }) {
+  const [hover, setHover] = useState(null); // { item, x, y } | null
+
+  const interact = useMemo(
+    () => ({
+      click: (it) => onSelectItem && onSelectItem(it),
+      enter: (it, e) => setHover({ item: it, x: e.clientX, y: e.clientY }),
+      move: (e) => setHover((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h)),
+      leave: () => setHover(null),
+    }),
+    [onSelectItem]
+  );
+
   const itemsByDate = useMemo(() => {
     const map = {};
     items.forEach((it) => {
@@ -210,6 +248,14 @@ export default function CalendarView({ items, granularity, setGranularity, refDa
       ? `Week of ${toISO(startOfWeek(refDate))}`
       : refDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
+  // Keep the hover card inside the viewport.
+  const cardPos = hover
+    ? {
+        left: Math.min(hover.x + 14, (typeof window !== "undefined" ? window.innerWidth : 1200) - 268),
+        top: Math.min(hover.y + 14, (typeof window !== "undefined" ? window.innerHeight : 800) - 210),
+      }
+    : null;
+
   return (
     <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6" style={{ border: `1px solid ${BORDER}` }}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -231,9 +277,15 @@ export default function CalendarView({ items, granularity, setGranularity, refDa
           ))}
         </div>
       </div>
-      {granularity === "month" && <MonthGrid refDate={refDate} itemsByDate={itemsByDate} />}
-      {granularity === "week" && <WeekGrid refDate={refDate} itemsByDate={itemsByDate} />}
-      {granularity === "day" && <DayTimeline refDate={refDate} itemsByDate={itemsByDate} />}
+      {granularity === "month" && <MonthGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} />}
+      {granularity === "week" && <WeekGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} />}
+      {granularity === "day" && <DayTimeline refDate={refDate} itemsByDate={itemsByDate} interact={interact} />}
+
+      {hover && (
+        <div style={{ position: "fixed", left: cardPos.left, top: cardPos.top, zIndex: 50, pointerEvents: "none" }}>
+          <TaskDetailCard item={hover.item} />
+        </div>
+      )}
     </div>
   );
 }

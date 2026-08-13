@@ -3,22 +3,45 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import { SEGMENTS, segColor, segName, NAVY, MUTED, BORDER, BG } from "../lib/constants";
-import { parseISO } from "../lib/dateUtils";
+import { parseISO, toISO, addDays, formatShortDate } from "../lib/dateUtils";
+import { TaskDetailCard } from "./shared";
 
-function ProjectGantt({ project }) {
+// Recharts calls this with the hovered bar's datapoint; we render the full card.
+function GanttTooltip({ active, payload }) {
+  if (!active || !payload || !payload.length) return null;
+  const task = payload[0].payload.task;
+  if (!task) return null;
+  return <TaskDetailCard item={task} />;
+}
+
+function ProjectGantt({ project, onSelectProject }) {
   const starts = project.tasks.map((t) => parseISO(t.start_date).getTime());
   const dues = project.tasks.map((t) => parseISO(t.due_date).getTime());
   const minStart = Math.min(...starts);
+  const minStartDate = new Date(minStart);
   const dayMs = 1000 * 60 * 60 * 24;
 
   const data = project.tasks.map((t) => {
     const offset = Math.round((parseISO(t.start_date).getTime() - minStart) / dayMs);
     const duration = Math.max(1, Math.round((parseISO(t.due_date).getTime() - parseISO(t.start_date).getTime()) / dayMs));
-    return { name: t.title, offset, duration };
+    return {
+      name: t.title,
+      offset,
+      duration,
+      // Full task carried through so the tooltip can show every field.
+      task: { ...t, segment: project.segment, project_name: project.name },
+    };
   });
 
   const color = segColor(project.segment);
   const dependents = project.tasks.filter((t) => t.depends_on);
+
+  // Axis spans day 0 → the project's last due date; label ticks with real dates.
+  const totalDays = Math.max(1, Math.round((Math.max(...dues) - minStart) / dayMs));
+  const step = totalDays <= 10 ? 2 : totalDays <= 28 ? 7 : 14;
+  const ticks = [];
+  for (let d = 0; d <= totalDays; d += step) ticks.push(d);
+  if (ticks[ticks.length - 1] !== totalDays) ticks.push(totalDays);
 
   return (
     <div>
@@ -32,13 +55,24 @@ function ProjectGantt({ project }) {
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#EEEBE4" />
           <XAxis
             type="number"
+            domain={[0, totalDays]}
+            ticks={ticks}
+            allowDecimals={false}
+            tickFormatter={(d) => formatShortDate(toISO(addDays(minStartDate, d)))}
             tick={{ fontSize: 11, fill: MUTED }}
-            label={{ value: "days from project start", position: "insideBottom", offset: -2, fontSize: 10, fill: MUTED }}
           />
           <YAxis type="category" dataKey="name" width={190} tick={{ fontSize: 11, fill: "#22303F" }} />
-          <Tooltip formatter={(value, name) => (name === "duration" ? [`${value} day(s)`, "duration"] : [value, name])} />
-          <Bar dataKey="offset" stackId="a" fill="transparent" />
-          <Bar dataKey="duration" stackId="a" fill={color} radius={[4, 4, 4, 4]} />
+          <Tooltip content={<GanttTooltip />} cursor={{ fill: "rgba(31,56,100,0.05)" }} wrapperStyle={{ outline: "none", zIndex: 50 }} />
+          <Bar dataKey="offset" stackId="a" fill="transparent" isAnimationActive={false} />
+          <Bar
+            dataKey="duration"
+            stackId="a"
+            fill={color}
+            radius={[4, 4, 4, 4]}
+            cursor="pointer"
+            isAnimationActive={false}
+            onClick={() => onSelectProject && onSelectProject(project)}
+          />
         </BarChart>
       </ResponsiveContainer>
       {dependents.length > 0 && (
@@ -58,7 +92,7 @@ function ProjectGantt({ project }) {
   );
 }
 
-export default function GanttView({ projects, activeSegments, setActiveSegments }) {
+export default function GanttView({ projects, activeSegments, setActiveSegments, onSelectProject }) {
   function toggleSegment(id) {
     setActiveSegments((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
@@ -90,7 +124,7 @@ export default function GanttView({ projects, activeSegments, setActiveSegments 
         <div className="text-sm py-8 text-center" style={{ color: MUTED }}>No projects match this filter.</div>
       )}
       <div className="space-y-8">
-        {filtered.map((p) => <ProjectGantt key={p.id} project={p} />)}
+        {filtered.map((p) => <ProjectGantt key={p.id} project={p} onSelectProject={onSelectProject} />)}
       </div>
     </div>
   );

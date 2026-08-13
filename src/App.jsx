@@ -224,10 +224,10 @@ export default function App() {
             <TodayView items={allItems} onSelectItem={openItem} />
           )}
           {view === "calendar" && (
-            <CalendarView items={allItems} granularity={calGranularity} setGranularity={setCalGranularity} refDate={calRefDate} setRefDate={setCalRefDate} />
+            <CalendarView items={allItems} granularity={calGranularity} setGranularity={setCalGranularity} refDate={calRefDate} setRefDate={setCalRefDate} onSelectItem={openItem} />
           )}
           {view === "gantt" && (
-            <GanttView projects={projects} activeSegments={ganttActiveSegments} setActiveSegments={setGanttActiveSegments} />
+            <GanttView projects={projects} activeSegments={ganttActiveSegments} setActiveSegments={setGanttActiveSegments} onSelectProject={openProject} />
           )}
           {view === "pie" && (
             <PieView items={allItems} period={period} setPeriod={setPeriod} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />

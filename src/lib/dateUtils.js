@@ -70,3 +70,9 @@ export function formatTime(s) {
   if (!t) return "";
   return formatHour(t.h, t.m);
 }
+
+// "2026-08-03" -> "Aug 3" (short month + day), "" for empty input.
+export function formatShortDate(iso) {
+  if (!iso) return "";
+  return parseISO(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
