@@ -3,7 +3,7 @@ import { ItemPill, TaskDetailCard } from "./shared";
 import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG, INK } from "../lib/constants";
 import { toISO, addDays, startOfWeek, buildMonthGrid, WEEKDAY_LABELS, parseTime, formatHour } from "../lib/dateUtils";
 
-function MonthGrid({ refDate, itemsByDate, interact }) {
+function MonthGrid({ refDate, itemsByDate, interact, onSelectDate }) {
   const weeks = buildMonthGrid(refDate);
   const month = refDate.getMonth();
   return (
@@ -21,15 +21,17 @@ function MonthGrid({ refDate, itemsByDate, interact }) {
           return (
             <div
               key={i}
+              onClick={() => onSelectDate && onSelectDate(iso)}
+              title="Open this day"
               className="rounded-lg p-2"
-              style={{ minHeight: 92, background: outside ? "#FAFAF8" : "#fff", border: "1px solid #EEEBE4" }}
+              style={{ minHeight: 92, background: outside ? "#FAFAF8" : "#fff", border: "1px solid #EEEBE4", cursor: onSelectDate ? "pointer" : "default" }}
             >
               <div className="text-xs mb-1" style={{ color: outside ? "#B7B2A6" : MUTED }}>{dt.getDate()}</div>
               {dayItems.slice(0, 3).map((it) => (
                 <ItemPill
                   key={it.id}
                   item={it}
-                  onClick={() => interact.click(it)}
+                  onClick={(e) => { e.stopPropagation(); interact.click(it); }}
                   onMouseEnter={(e) => interact.enter(it, e)}
                   onMouseMove={interact.move}
                   onMouseLeave={interact.leave}
@@ -46,7 +48,7 @@ function MonthGrid({ refDate, itemsByDate, interact }) {
   );
 }
 
-function WeekGrid({ refDate, itemsByDate, interact }) {
+function WeekGrid({ refDate, itemsByDate, interact, onSelectDate }) {
   const start = startOfWeek(refDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   return (
@@ -55,13 +57,19 @@ function WeekGrid({ refDate, itemsByDate, interact }) {
         const iso = toISO(dt);
         const dayItems = itemsByDate[iso] || [];
         return (
-          <div key={i} className="rounded-lg p-2" style={{ minHeight: 160, border: "1px solid #EEEBE4" }}>
+          <div
+            key={i}
+            onClick={() => onSelectDate && onSelectDate(iso)}
+            title="Open this day"
+            className="rounded-lg p-2"
+            style={{ minHeight: 160, border: "1px solid #EEEBE4", cursor: onSelectDate ? "pointer" : "default" }}
+          >
             <div className="text-xs font-medium mb-2" style={{ color: MUTED }}>{WEEKDAY_LABELS[i]} {dt.getDate()}</div>
             {dayItems.map((it) => (
               <ItemPill
                 key={it.id}
                 item={it}
-                onClick={() => interact.click(it)}
+                onClick={(e) => { e.stopPropagation(); interact.click(it); }}
                 onMouseEnter={(e) => interact.enter(it, e)}
                 onMouseMove={interact.move}
                 onMouseLeave={interact.leave}
@@ -212,7 +220,7 @@ function DayTimeline({ refDate, itemsByDate, interact }) {
   );
 }
 
-export default function CalendarView({ items, granularity, setGranularity, refDate, setRefDate, onSelectItem }) {
+export default function CalendarView({ items, granularity, setGranularity, refDate, setRefDate, onSelectItem, onSelectDate }) {
   const [hover, setHover] = useState(null); // { item, x, y } | null
 
   const interact = useMemo(
@@ -277,8 +285,8 @@ export default function CalendarView({ items, granularity, setGranularity, refDa
           ))}
         </div>
       </div>
-      {granularity === "month" && <MonthGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} />}
-      {granularity === "week" && <WeekGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} />}
+      {granularity === "month" && <MonthGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} onSelectDate={onSelectDate} />}
+      {granularity === "week" && <WeekGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} onSelectDate={onSelectDate} />}
       {granularity === "day" && <DayTimeline refDate={refDate} itemsByDate={itemsByDate} interact={interact} />}
 
       {hover && (

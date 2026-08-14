@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import ListView from "./components/ListView";
-import TodayView from "./components/TodayView";
+import DailyView from "./components/DailyView";
 import CalendarView from "./components/CalendarView";
 import GanttView from "./components/GanttView";
 import PieView from "./components/PieView";
 import AddTaskForm from "./components/AddTaskForm";
 import AddProjectForm from "./components/AddProjectForm";
 import { SEGMENTS, PRIORITIES, NAVY, BG, INK, BORDER } from "./lib/constants";
+import { parseISO } from "./lib/dateUtils";
 import {
   fetchTasks, fetchProjects, createTask, createProject,
   updateTask, deleteTask, updateProject, deleteProject,
@@ -27,6 +28,8 @@ export default function App() {
 
   const [calGranularity, setCalGranularity] = useState("month");
   const [calRefDate, setCalRefDate] = useState(new Date());
+
+  const [dailyRefDate, setDailyRefDate] = useState(new Date());
 
   const [ganttActiveSegments, setGanttActiveSegments] = useState(SEGMENTS.map((s) => s.id));
 
@@ -78,7 +81,14 @@ export default function App() {
     return [...standalone, ...fromProjects];
   }, [tasks, projects]);
 
-  // Opens the right editor for a unified item from Today/Calendar: standalone
+  // Jumps to the Daily view focused on a specific date (e.g. clicking a day in
+  // the Calendar).
+  function openDay(iso) {
+    setDailyRefDate(parseISO(iso));
+    setView("daily");
+  }
+
+  // Opens the right editor for a unified item from Daily/Calendar: standalone
   // tasks open the task editor; a project step opens its whole-project editor.
   function openItem(item) {
     if (item.kind === "project") {
@@ -166,7 +176,7 @@ export default function App() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
         <div className="flex gap-2">
-          {[["list", "Overview"], ["today", "Today"], ["calendar", "Calendar"], ["gantt", "Gantt"], ["pie", "Time Allocation"]].map(([key, label]) => (
+          {[["list", "Overview"], ["daily", "Daily"], ["calendar", "Calendar"], ["gantt", "Gantt"], ["pie", "Time Allocation"]].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setView(key)}
@@ -220,11 +230,11 @@ export default function App() {
               onSelectProject={openProject}
             />
           )}
-          {view === "today" && (
-            <TodayView items={allItems} onSelectItem={openItem} />
+          {view === "daily" && (
+            <DailyView items={allItems} onSelectItem={openItem} refDate={dailyRefDate} setRefDate={setDailyRefDate} />
           )}
           {view === "calendar" && (
-            <CalendarView items={allItems} granularity={calGranularity} setGranularity={setCalGranularity} refDate={calRefDate} setRefDate={setCalRefDate} onSelectItem={openItem} />
+            <CalendarView items={allItems} granularity={calGranularity} setGranularity={setCalGranularity} refDate={calRefDate} setRefDate={setCalRefDate} onSelectItem={openItem} onSelectDate={openDay} />
           )}
           {view === "gantt" && (
             <GanttView projects={projects} activeSegments={ganttActiveSegments} setActiveSegments={setGanttActiveSegments} onSelectProject={openProject} />

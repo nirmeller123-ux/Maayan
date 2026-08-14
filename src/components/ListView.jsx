@@ -52,6 +52,7 @@ export default function ListView({
 
   const filteredTasks = useMemo(() => {
     return tasks
+      .filter((t) => t.status !== "Done") // completed tasks drop off the Overview
       .filter((t) => activeSegments.includes(t.segment))
       .filter((t) => activePriorities.includes(t.priority))
       .filter((t) => matchesTimeFrame(t.due_date, timeFrame))
