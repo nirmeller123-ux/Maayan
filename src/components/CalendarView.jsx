@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { ItemPill, TaskDetailCard } from "./shared";
 import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG, INK } from "../lib/constants";
-import { toISO, addDays, startOfWeek, buildMonthGrid, WEEKDAY_LABELS, parseTime, formatHour } from "../lib/dateUtils";
+import { toISO, addDays, startOfWeek, buildMonthGrid, WEEKDAY_LABELS, parseTime, formatHour, eachDayISO } from "../lib/dateUtils";
 
 function MonthGrid({ refDate, itemsByDate, interact, onSelectDate }) {
   const weeks = buildMonthGrid(refDate);
@@ -95,7 +95,11 @@ function DayTimeline({ refDate, itemsByDate, interact }) {
 
   const timed = [];
   const untimed = [];
-  dayItems.forEach((it) => (parseTime(it.start_time) ? timed : untimed).push(it));
+  // A timed slot only applies to single-day items; multi-day tasks are all-day.
+  dayItems.forEach((it) => {
+    const single = !it.start_date || it.start_date === it.due_date;
+    (parseTime(it.start_time) && single ? timed : untimed).push(it);
+  });
   // Sort timed items chronologically by start time (earliest first).
   timed.sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
 
@@ -237,8 +241,10 @@ export default function CalendarView({ items, granularity, setGranularity, refDa
     const map = {};
     items.forEach((it) => {
       if (!it.due_date) return;
-      map[it.due_date] = map[it.due_date] || [];
-      map[it.due_date].push(it);
+      // Multi-day items (start_date < due_date) appear on every day they span.
+      eachDayISO(it.start_date || it.due_date, it.due_date).forEach((iso) => {
+        (map[iso] = map[iso] || []).push(it);
+      });
     });
     return map;
   }, [items]);

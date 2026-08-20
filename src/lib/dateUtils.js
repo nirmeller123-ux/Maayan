@@ -76,3 +76,25 @@ export function formatShortDate(iso) {
   if (!iso) return "";
   return parseISO(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
+
+// Inclusive list of ISO dates from startIso..endIso. Returns [endIso] when
+// there's no start (or start is after end). Capped so a bad range can't blow up.
+export function eachDayISO(startIso, endIso) {
+  if (!endIso) return startIso ? [startIso] : [];
+  if (!startIso || startIso > endIso) return [endIso];
+  const out = [];
+  let cur = parseISO(startIso);
+  const end = parseISO(endIso);
+  while (cur <= end && out.length < 366) {
+    out.push(toISO(cur));
+    cur = addDays(cur, 1);
+  }
+  return out;
+}
+
+// Whether an item's day-span (start_date..due_date) covers a given ISO date.
+// A missing start_date means the item lives only on its due_date.
+export function spanCovers(item, iso) {
+  const start = item.start_date || item.due_date;
+  return !!item.due_date && start <= iso && item.due_date >= iso;
+}

@@ -6,6 +6,7 @@ import GanttView from "./components/GanttView";
 import PieView from "./components/PieView";
 import AddTaskForm from "./components/AddTaskForm";
 import AddProjectForm from "./components/AddProjectForm";
+import Modal from "./components/Modal";
 import { SEGMENTS, PRIORITIES, NAVY, BG, INK, BORDER } from "./lib/constants";
 import { parseISO } from "./lib/dateUtils";
 import {
@@ -194,22 +195,26 @@ export default function App() {
       </div>
 
       {taskEditor && (
-        <AddTaskForm
-          mode={taskEditor === "new" ? "create" : "edit"}
-          initialTask={taskEditor === "new" ? null : taskEditor}
-          onCancel={() => setTaskEditor(null)}
-          onSubmit={handleTaskSubmit}
-          onDelete={handleDeleteTask}
-        />
+        <Modal onClose={() => setTaskEditor(null)}>
+          <AddTaskForm
+            mode={taskEditor === "new" ? "create" : "edit"}
+            initialTask={taskEditor === "new" ? null : taskEditor}
+            onCancel={() => setTaskEditor(null)}
+            onSubmit={handleTaskSubmit}
+            onDelete={handleDeleteTask}
+          />
+        </Modal>
       )}
       {projectEditor && (
-        <AddProjectForm
-          mode={projectEditor === "new" ? "create" : "edit"}
-          initialProject={projectEditor === "new" ? null : projectEditor}
-          onCancel={() => setProjectEditor(null)}
-          onSubmit={handleProjectSubmit}
-          onDelete={handleDeleteProject}
-        />
+        <Modal onClose={() => setProjectEditor(null)}>
+          <AddProjectForm
+            mode={projectEditor === "new" ? "create" : "edit"}
+            initialProject={projectEditor === "new" ? null : projectEditor}
+            onCancel={() => setProjectEditor(null)}
+            onSubmit={handleProjectSubmit}
+            onDelete={handleDeleteProject}
+          />
+        </Modal>
       )}
 
       {loading ? (

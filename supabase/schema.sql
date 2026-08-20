@@ -7,6 +7,10 @@ create extension if not exists "pgcrypto";
 create table if not exists tasks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
+  -- due_date is the task's end date. start_date is optional: null means a
+  -- single-day task (starts and ends on due_date); a value makes it a
+  -- multi-day, all-day task spanning start_date -> due_date.
+  start_date date,
   due_date date not null,
   priority text not null check (priority in ('High', 'Medium', 'Low')),
   hours numeric not null default 0,

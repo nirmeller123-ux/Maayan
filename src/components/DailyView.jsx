@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG } from "../lib/constants";
 import { PriorityBadge, StatusBadge } from "./shared";
-import { parseISO, toISO, addDays, formatTime } from "../lib/dateUtils";
+import { parseISO, toISO, addDays, formatTime, spanCovers } from "../lib/dateUtils";
 
 // Sort within a bucket: earlier due date first, then timed items by clock time
 // (untimed last), then by priority.
@@ -74,16 +74,15 @@ export default function DailyView({ items, onSelectItem, refDate, setRefDate }) 
   const isToday = selIso === toISO(new Date());
 
   const { overdue, selected, next } = useMemo(() => {
-    const selStart = parseISO(selIso);
     const overdue = [];
     const selected = [];
     const next = [];
     items.forEach((it) => {
       if (!it.due_date) return;
-      const due = parseISO(it.due_date);
-      if (it.due_date === selIso) selected.push(it);
-      else if (it.due_date === nextIso) next.push(it);
-      else if (due < selStart) {
+      // Span-aware: a multi-day item lands in the earliest bucket it covers.
+      if (spanCovers(it, selIso)) selected.push(it);
+      else if (spanCovers(it, nextIso)) next.push(it);
+      else if (it.due_date < selIso) {
         // Completed work shouldn't nag from the overdue pile.
         if (it.status === "Done") return;
         overdue.push(it);

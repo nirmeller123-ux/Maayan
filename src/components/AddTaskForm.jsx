@@ -1,10 +1,15 @@
 import React, { useState } from "react";
 import { SEGMENTS, PRIORITIES, STATUSES, NAVY, BORDER, MUTED } from "../lib/constants";
 import { toISO, addDays, timeInputValue } from "../lib/dateUtils";
+import RangePicker from "./RangePicker";
 
 export default function AddTaskForm({ mode = "create", initialTask, onCancel, onSubmit, onDelete }) {
   const [title, setTitle] = useState(initialTask ? initialTask.title : "");
   const [dueDate, setDueDate] = useState(initialTask ? initialTask.due_date : toISO(addDays(new Date(), 7)));
+  // start_date makes a task multi-day; default to the same day as due (single day).
+  const [startDate, setStartDate] = useState(
+    initialTask ? (initialTask.start_date || initialTask.due_date) : toISO(addDays(new Date(), 7))
+  );
   const [startTime, setStartTime] = useState(initialTask ? timeInputValue(initialTask.start_time) : "");
   const [priority, setPriority] = useState(initialTask ? initialTask.priority : "Medium");
   const [status, setStatus] = useState(initialTask ? initialTask.status || "Not Started" : "Not Started");
@@ -21,6 +26,7 @@ export default function AddTaskForm({ mode = "create", initialTask, onCancel, on
       await onSubmit({
         id: initialTask ? initialTask.id : undefined,
         title: title.trim(),
+        start_date: startDate,
         due_date: dueDate,
         start_time: startTime ? startTime : null,
         priority,
@@ -55,32 +61,37 @@ export default function AddTaskForm({ mode = "create", initialTask, onCancel, on
         <label className={fieldLabel} style={{ color: MUTED }}>Title</label>
         <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title" className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }} />
       </div>
-      <div>
-        <label className={fieldLabel} style={{ color: MUTED }}>Due date</label>
-        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }} />
+      <div className="md:col-span-3">
+        <label className={fieldLabel} style={{ color: MUTED }}>Dates (drag for a multi-day task)</label>
+        <RangePicker
+          start_date={startDate}
+          due_date={dueDate}
+          onChange={({ start_date, due_date }) => { setStartDate(start_date); setDueDate(due_date); }}
+        />
       </div>
-      <div>
+
+      <div className="md:col-span-2">
         <label className={fieldLabel} style={{ color: MUTED }}>Start time</label>
         <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }} />
       </div>
-      <div>
+      <div className="md:col-span-2">
         <label className={fieldLabel} style={{ color: MUTED }}>Hours</label>
         <input type="number" min="0" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }} placeholder="Hours" />
       </div>
-
       <div className="md:col-span-2">
         <label className={fieldLabel} style={{ color: MUTED }}>Segment</label>
         <select value={segment} onChange={(e) => setSegment(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }}>
           {SEGMENTS.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
-      <div className="md:col-span-2">
+
+      <div className="md:col-span-3">
         <label className={fieldLabel} style={{ color: MUTED }}>Priority</label>
         <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }}>
           {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
-      <div className="md:col-span-2">
+      <div className="md:col-span-3">
         <label className={fieldLabel} style={{ color: MUTED }}>Status</label>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }}>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}

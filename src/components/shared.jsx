@@ -68,10 +68,10 @@ function DetailRow({ label, children }) {
 export function TaskDetailCard({ item }) {
   const time = formatTime(item.start_time);
   const isStep = !!item.project_name;
-  const dateText =
-    isStep && item.start_date && item.start_date !== item.due_date
-      ? `${formatShortDate(item.start_date)} → ${formatShortDate(item.due_date)}`
-      : formatShortDate(item.due_date);
+  const hasRange = item.start_date && item.start_date !== item.due_date;
+  const dateText = hasRange
+    ? `${formatShortDate(item.start_date)} → ${formatShortDate(item.due_date)}`
+    : formatShortDate(item.due_date);
 
   return (
     <div
@@ -96,7 +96,7 @@ export function TaskDetailCard({ item }) {
       <div className="flex flex-col gap-1">
         <DetailRow label="Segment">{segName(item.segment)}</DetailRow>
         {isStep && <DetailRow label="Project">{item.project_name}</DetailRow>}
-        <DetailRow label={isStep && dateText.includes("→") ? "Dates" : "Due"}>{dateText}</DetailRow>
+        <DetailRow label={hasRange ? "Dates" : "Due"}>{dateText}</DetailRow>
         {time && <DetailRow label="Start">{time}</DetailRow>}
         <DetailRow label="Hours">{item.hours}h</DetailRow>
       </div>
