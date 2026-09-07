@@ -4,6 +4,7 @@ import DailyView from "./components/DailyView";
 import CalendarView from "./components/CalendarView";
 import GanttView from "./components/GanttView";
 import PieView from "./components/PieView";
+import CanvasView from "./components/CanvasView";
 import AddTaskForm from "./components/AddTaskForm";
 import AddProjectForm from "./components/AddProjectForm";
 import Modal from "./components/Modal";
@@ -177,7 +178,7 @@ export default function App() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
         <div className="flex gap-2">
-          {[["list", "Overview"], ["daily", "Daily"], ["calendar", "Calendar"], ["gantt", "Gantt"], ["pie", "Time Allocation"]].map(([key, label]) => (
+          {[["list", "Overview"], ["daily", "Daily"], ["calendar", "Calendar"], ["gantt", "Gantt"], ["pie", "Time Allocation"], ["canvas", "Canvas"]].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setView(key)}
@@ -247,6 +248,7 @@ export default function App() {
           {view === "pie" && (
             <PieView items={allItems} period={period} setPeriod={setPeriod} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />
           )}
+          {view === "canvas" && <CanvasView />}
         </>
       )}
     </div>

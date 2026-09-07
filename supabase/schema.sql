@@ -79,3 +79,34 @@ create policy "Allow all on project_tasks" on project_tasks
 alter publication supabase_realtime add table tasks;
 alter publication supabase_realtime add table projects;
 alter publication supabase_realtime add table project_tasks;
+
+-- Canvas --------------------------------------------------------------------
+-- Per-day free writing, a free-hand sketch (stored as an image), and file
+-- attachments. Files live in a private Storage bucket, served via signed URLs.
+create table if not exists canvas_days (
+  date date primary key,
+  notes text not null default '',
+  sketch_path text,
+  updated_at timestamptz not null default now()
+);
+create table if not exists canvas_files (
+  id uuid primary key default gen_random_uuid(),
+  date date not null,
+  name text not null,
+  path text not null,
+  mime text,
+  size bigint,
+  created_at timestamptz not null default now()
+);
+alter table canvas_days enable row level security;
+alter table canvas_files enable row level security;
+create policy "Allow all on canvas_days" on canvas_days for all using (true) with check (true);
+create policy "Allow all on canvas_files" on canvas_files for all using (true) with check (true);
+
+insert into storage.buckets (id, name, public)
+  values ('canvas', 'canvas', false)
+  on conflict (id) do nothing;
+create policy "canvas read"   on storage.objects for select using (bucket_id = 'canvas');
+create policy "canvas insert" on storage.objects for insert with check (bucket_id = 'canvas');
+create policy "canvas update" on storage.objects for update using (bucket_id = 'canvas') with check (bucket_id = 'canvas');
+create policy "canvas delete" on storage.objects for delete using (bucket_id = 'canvas');

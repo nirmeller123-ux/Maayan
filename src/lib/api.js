@@ -168,6 +168,62 @@ export async function updateProject({ id, name, segment, steps }) {
   return true;
 }
 
+// ---- Canvas: per-day notes, sketch, and file attachments ------------------
+
+export async function fetchCanvasDay(date) {
+  const { data, error } = await supabase.from("canvas_days").select("*").eq("date", date).maybeSingle();
+  if (error) throw error;
+  return data; // null if the day has no canvas yet
+}
+
+export async function saveCanvasDay(date, patch) {
+  const { error } = await supabase
+    .from("canvas_days")
+    .upsert({ date, ...patch, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
+export async function fetchCanvasFiles(date) {
+  const { data, error } = await supabase
+    .from("canvas_files")
+    .select("*")
+    .eq("date", date)
+    .order("created_at");
+  if (error) throw error;
+  return data;
+}
+
+export async function addCanvasFileRow(row) {
+  const { data, error } = await supabase.from("canvas_files").insert(row).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCanvasFileRow(id) {
+  const { error } = await supabase.from("canvas_files").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// Storage (private "canvas" bucket) — reads go through short-lived signed URLs.
+export async function uploadCanvasObject(path, body, contentType) {
+  const { error } = await supabase.storage
+    .from("canvas")
+    .upload(path, body, { upsert: true, contentType });
+  if (error) throw error;
+  return path;
+}
+
+export async function signedCanvasUrl(path, expiresIn = 3600) {
+  const { data, error } = await supabase.storage.from("canvas").createSignedUrl(path, expiresIn);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function removeCanvasObject(path) {
+  const { error } = await supabase.storage.from("canvas").remove([path]);
+  if (error) throw error;
+}
+
 // Subscribes to changes on all three tables so the UI can refetch and stay
 // in sync across devices. Returns an unsubscribe function.
 export function subscribeToChanges(onChange) {

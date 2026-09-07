@@ -1,9 +1,24 @@
 import React, { useMemo, useState } from "react";
 import { ItemPill, TaskDetailCard } from "./shared";
-import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG, INK } from "../lib/constants";
+import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG, INK, HOLIDAY } from "../lib/constants";
 import { toISO, addDays, startOfWeek, buildMonthGrid, WEEKDAY_LABELS, parseTime, formatHour, eachDayISO } from "../lib/dateUtils";
+import { holidaysByDate } from "../lib/holidays";
 
-function MonthGrid({ refDate, itemsByDate, interact, onSelectDate }) {
+// Small right-to-left Hebrew holiday label(s) for a day.
+function HolidayLabel({ names, size = 10 }) {
+  if (!names || names.length === 0) return null;
+  return (
+    <div dir="rtl" style={{ marginBottom: 2 }}>
+      {names.map((n, i) => (
+        <div key={i} className="truncate" style={{ fontSize: size, color: HOLIDAY, fontWeight: 600, lineHeight: 1.25 }} title={n}>
+          {n}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MonthGrid({ refDate, itemsByDate, interact, onSelectDate, holidays }) {
   const weeks = buildMonthGrid(refDate);
   const month = refDate.getMonth();
   return (
@@ -27,6 +42,7 @@ function MonthGrid({ refDate, itemsByDate, interact, onSelectDate }) {
               style={{ minHeight: 92, background: outside ? "#FAFAF8" : "#fff", border: "1px solid #EEEBE4", cursor: onSelectDate ? "pointer" : "default" }}
             >
               <div className="text-xs mb-1" style={{ color: outside ? "#B7B2A6" : MUTED }}>{dt.getDate()}</div>
+              <HolidayLabel names={holidays[iso]} />
               {dayItems.slice(0, 3).map((it) => (
                 <ItemPill
                   key={it.id}
@@ -48,7 +64,7 @@ function MonthGrid({ refDate, itemsByDate, interact, onSelectDate }) {
   );
 }
 
-function WeekGrid({ refDate, itemsByDate, interact, onSelectDate }) {
+function WeekGrid({ refDate, itemsByDate, interact, onSelectDate, holidays }) {
   const start = startOfWeek(refDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   return (
@@ -64,7 +80,8 @@ function WeekGrid({ refDate, itemsByDate, interact, onSelectDate }) {
             className="rounded-lg p-2"
             style={{ minHeight: 160, border: "1px solid #EEEBE4", cursor: onSelectDate ? "pointer" : "default" }}
           >
-            <div className="text-xs font-medium mb-2" style={{ color: MUTED }}>{WEEKDAY_LABELS[i]} {dt.getDate()}</div>
+            <div className="text-xs font-medium mb-1" style={{ color: MUTED }}>{WEEKDAY_LABELS[i]} {dt.getDate()}</div>
+            <HolidayLabel names={holidays[iso]} />
             {dayItems.map((it) => (
               <ItemPill
                 key={it.id}
@@ -89,9 +106,10 @@ const GUTTER = 56; // px width of the left time-label column
 // An hour-by-hour timeline for a single day. Items with a start_time are placed
 // on the grid at their hour/minute (earliest first); items without one appear
 // in an "All day / untimed" strip above the timeline.
-function DayTimeline({ refDate, itemsByDate, interact }) {
+function DayTimeline({ refDate, itemsByDate, interact, holidays }) {
   const iso = toISO(refDate);
   const dayItems = itemsByDate[iso] || [];
+  const dayHolidays = holidays[iso] || [];
 
   const timed = [];
   const untimed = [];
@@ -132,6 +150,11 @@ function DayTimeline({ refDate, itemsByDate, interact }) {
 
   return (
     <div>
+      {dayHolidays.length > 0 && (
+        <div dir="rtl" className="rounded-lg px-3 py-2 mb-3 text-sm font-semibold" style={{ background: `${HOLIDAY}14`, color: HOLIDAY, border: `1px solid ${HOLIDAY}33` }}>
+          {dayHolidays.join(" · ")}
+        </div>
+      )}
       <div className="mb-3">
         <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: MUTED }}>
           All day / untimed ({untimed.length})
@@ -249,6 +272,22 @@ export default function CalendarView({ items, granularity, setGranularity, refDa
     return map;
   }, [items]);
 
+  const holidays = useMemo(() => {
+    let start, end;
+    if (granularity === "month") {
+      const flat = buildMonthGrid(refDate).flat();
+      start = flat[0];
+      end = flat[flat.length - 1];
+    } else if (granularity === "week") {
+      start = startOfWeek(refDate);
+      end = addDays(start, 6);
+    } else {
+      start = refDate;
+      end = refDate;
+    }
+    return holidaysByDate(start, end);
+  }, [granularity, refDate]);
+
   function shift(n) {
     if (granularity === "month") setRefDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + n, 1));
     else if (granularity === "week") setRefDate((prev) => addDays(prev, 7 * n));
@@ -291,9 +330,9 @@ export default function CalendarView({ items, granularity, setGranularity, refDa
           ))}
         </div>
       </div>
-      {granularity === "month" && <MonthGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} onSelectDate={onSelectDate} />}
-      {granularity === "week" && <WeekGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} onSelectDate={onSelectDate} />}
-      {granularity === "day" && <DayTimeline refDate={refDate} itemsByDate={itemsByDate} interact={interact} />}
+      {granularity === "month" && <MonthGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} onSelectDate={onSelectDate} holidays={holidays} />}
+      {granularity === "week" && <WeekGrid refDate={refDate} itemsByDate={itemsByDate} interact={interact} onSelectDate={onSelectDate} holidays={holidays} />}
+      {granularity === "day" && <DayTimeline refDate={refDate} itemsByDate={itemsByDate} interact={interact} holidays={holidays} />}
 
       {hover && (
         <div style={{ position: "fixed", left: cardPos.left, top: cardPos.top, zIndex: 50, pointerEvents: "none" }}>

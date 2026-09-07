@@ -23,6 +23,7 @@ export function statusStyle(s) {
 }
 
 export const NAVY = "#1F3864";
+export const HOLIDAY = "#8A6D3B"; // olive-gold, for Jewish/Israeli holiday labels
 export const BG = "#F6F4F0";
 export const INK = "#22303F";
 export const MUTED = "#667085";

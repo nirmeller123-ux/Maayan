@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
-import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG } from "../lib/constants";
+import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG, HOLIDAY } from "../lib/constants";
 import { PriorityBadge, StatusBadge } from "./shared";
 import { parseISO, toISO, addDays, formatTime, spanCovers } from "../lib/dateUtils";
+import { holidaysByDate } from "../lib/holidays";
 
 // Sort within a bucket: earlier due date first, then timed items by clock time
 // (untimed last), then by priority.
@@ -95,6 +96,7 @@ export default function DailyView({ items, onSelectItem, refDate, setRefDate }) 
   }, [items, selIso, nextIso]);
 
   const total = overdue.length + selected.length + next.length;
+  const dayHolidays = useMemo(() => holidaysByDate(refDate, refDate)[selIso] || [], [selIso]); // eslint-disable-line react-hooks/exhaustive-deps
   const fmt = (iso, opts) => parseISO(iso).toLocaleDateString(undefined, opts);
   const selLabel = isToday ? "Due today" : `Due ${fmt(selIso, { weekday: "short", month: "short", day: "numeric" })}`;
   const nextLabel = isToday ? "Due tomorrow" : `Due ${fmt(nextIso, { weekday: "short", month: "short", day: "numeric" })}`;
@@ -135,6 +137,12 @@ export default function DailyView({ items, onSelectItem, refDate, setRefDate }) 
           {isToday ? " · Today" : ""} · {total} item{total !== 1 ? "s" : ""}
         </div>
       </div>
+
+      {dayHolidays.length > 0 && (
+        <div dir="rtl" className="rounded-lg px-3 py-2 mb-4 text-sm font-semibold" style={{ background: `${HOLIDAY}14`, color: HOLIDAY, border: `1px solid ${HOLIDAY}33` }}>
+          {dayHolidays.join(" · ")}
+        </div>
+      )}
 
       {total === 0 ? (
         <div className="text-sm py-8 text-center" style={{ color: MUTED }}>

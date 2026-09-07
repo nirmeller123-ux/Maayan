@@ -14,10 +14,9 @@ export function addDays(dt, n) {
 }
 
 export function startOfWeek(dt) {
+  // Weeks start on Sunday (getDay(): 0 = Sunday).
   const r = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-  const day = r.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  r.setDate(r.getDate() + diff);
+  r.setDate(r.getDate() - r.getDay());
   return r;
 }
 
@@ -40,7 +39,7 @@ export function buildMonthGrid(refDate) {
   return weeks;
 }
 
-export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // "14:30" / "14:30:00" -> { h: 14, m: 30 }, or null for empty/invalid input.
 export function parseTime(s) {
