@@ -84,7 +84,9 @@ Rules:
   try {
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
-      model: "claude-haiku-4-5",
+      // Sonnet handles Hebrew/free-form extraction reliably (Haiku mis-parsed
+      // Hebrew). Still ~a fifth of a cent per spoken task.
+      model: "claude-sonnet-5",
       max_tokens: 600,
       system,
       tools: [TOOL],
