@@ -177,7 +177,7 @@ export default function App() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[["list", "Overview"], ["daily", "Daily"], ["calendar", "Calendar"], ["gantt", "Gantt"], ["pie", "Time Allocation"], ["canvas", "Canvas"]].map(([key, label]) => (
             <button
               key={key}

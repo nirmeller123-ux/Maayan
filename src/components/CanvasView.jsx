@@ -242,12 +242,12 @@ export default function CanvasView() {
           <button onClick={() => flushThen(toISO(addDays(parseISO(date), 1)))} className={navBtn} style={{ border: `1px solid ${BORDER}` }} aria-label="Next day">&rarr;</button>
           {!isToday && <button onClick={() => flushThen(toISO(new Date()))} className="px-3 py-1 rounded-full text-sm font-medium" style={{ background: BG, color: NAVY, border: `1px solid ${BORDER}` }}>Today</button>}
         </div>
-        <div className="text-xs" style={{ color: MUTED }}>{heading}{status ? ` · ${status}` : ""}</div>
+        <div className="text-xs" style={{ color: MUTED }}>{heading} · {status || "Auto-saves"}</div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        {/* Sketch */}
-        <div>
+      <div className="flex flex-col gap-5 md:grid md:grid-cols-2">
+        {/* Sketch (below the notes on mobile, beside them on desktop) */}
+        <div className="order-2 md:order-none">
           <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: MUTED }}>Sketch</div>
           <div className="flex flex-wrap items-center gap-2 mb-2">
             {SWATCHES.map((c) => (
@@ -273,8 +273,8 @@ export default function CanvasView() {
           />
         </div>
 
-        {/* Notes + attachments */}
-        <div className="flex flex-col gap-5">
+        {/* Notes + attachments (first on mobile, so writing sits above the sketch) */}
+        <div className="flex flex-col gap-5 order-1 md:order-none">
           <div className="flex flex-col">
             <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: MUTED }}>Notes &amp; thoughts</div>
             <textarea
