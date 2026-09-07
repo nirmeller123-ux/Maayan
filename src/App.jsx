@@ -5,6 +5,7 @@ import CalendarView from "./components/CalendarView";
 import GanttView from "./components/GanttView";
 import PieView from "./components/PieView";
 import CanvasView from "./components/CanvasView";
+import MicButton from "./components/MicButton";
 import AddTaskForm from "./components/AddTaskForm";
 import AddProjectForm from "./components/AddProjectForm";
 import Modal from "./components/Modal";
@@ -32,6 +33,9 @@ export default function App() {
   const [calRefDate, setCalRefDate] = useState(new Date());
 
   const [dailyRefDate, setDailyRefDate] = useState(new Date());
+
+  const [voiceLang, setVoiceLang] = useState("he-IL");
+  const [toast, setToast] = useState(null); // { text, onUndo? }
 
   const [ganttActiveSegments, setGanttActiveSegments] = useState(SEGMENTS.map((s) => s.id));
 
@@ -61,6 +65,12 @@ export default function App() {
     const unsubscribe = subscribeToChanges(() => loadAll());
     return unsubscribe;
   }, [loadAll]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), toast.onUndo ? 8000 : 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const allItems = useMemo(() => {
     const standalone = tasks.map((t) => ({ ...t, kind: "task" }));
@@ -117,6 +127,56 @@ export default function App() {
   function openProject(project) {
     setProjectEditor(project);
     setTaskEditor(null);
+  }
+
+  // Spoken instruction -> parsed by the serverless function -> created immediately,
+  // with an Undo in the toast (per "create immediately, no confirm step").
+  async function handleVoiceTranscript(transcript) {
+    setToast({ text: "Understanding…" });
+    try {
+      const now = new Date();
+      const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const res = await fetch("/api/parse-task", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          transcript,
+          today: todayIso,
+          weekday: now.toLocaleDateString(undefined, { weekday: "long" }),
+          segments: SEGMENTS.map((s) => ({ id: s.id, name: s.name })),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setToast({ text: err.error === "missing_key" ? "Voice isn't set up yet — add ANTHROPIC_API_KEY in Vercel." : "Couldn't understand that — try again." });
+        return;
+      }
+      const { item } = await res.json();
+      if (item.kind === "project") {
+        const created = await createProject({
+          name: item.name || item.title || "Project",
+          segment: item.segment || "other",
+          steps: (item.steps || []).map((s) => ({ ...s, status: s.status || "Not Started" })),
+        });
+        await loadAll();
+        setToast({ text: `Added project “${created.name}”`, onUndo: async () => { await deleteProject(created.id); await loadAll(); setToast(null); } });
+      } else {
+        const created = await createTask({
+          title: item.title,
+          start_date: item.start_date || null,
+          due_date: item.due_date || todayIso,
+          start_time: item.start_time || null,
+          priority: item.priority || "Medium",
+          status: "Not Started",
+          hours: Number(item.hours) || 1,
+          segment: item.segment || "other",
+        });
+        await loadAll();
+        setToast({ text: `Added “${created.title}” · ${created.due_date}`, onUndo: async () => { await deleteTask(created.id); await loadAll(); setToast(null); } });
+      }
+    } catch {
+      setToast({ text: "Voice request failed — check your connection." });
+    }
   }
 
   async function handleTaskSubmit(data) {
@@ -189,7 +249,9 @@ export default function App() {
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <button onClick={() => setVoiceLang((l) => (l === "he-IL" ? "en-US" : "he-IL"))} title="Voice language" className="text-xs px-2 py-2 rounded-full" style={{ border: `1px solid ${BORDER}`, color: NAVY }}>{voiceLang === "he-IL" ? "עב" : "EN"}</button>
+          <MicButton onFinish={handleVoiceTranscript} lang={voiceLang} label="Voice task" title="Add a task by voice" />
           <button onClick={() => (taskEditor ? setTaskEditor(null) : openNewTask())} className="px-4 py-2 rounded-full text-sm font-medium" style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY }}>+ Add Task</button>
           <button onClick={() => (projectEditor ? setProjectEditor(null) : openNewProject())} className="px-4 py-2 rounded-full text-sm font-medium" style={{ background: NAVY, color: "#fff" }}>+ Add Project</button>
         </div>
@@ -250,6 +312,19 @@ export default function App() {
           )}
           {view === "canvas" && <CanvasView />}
         </>
+      )}
+
+      {toast && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm"
+          style={{ position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", background: NAVY, color: "#fff", zIndex: 200, maxWidth: "92vw" }}
+        >
+          <span className="truncate">{toast.text}</span>
+          {toast.onUndo && (
+            <button onClick={toast.onUndo} className="text-sm font-semibold underline" style={{ color: "#fff", flexShrink: 0 }}>Undo</button>
+          )}
+          <button onClick={() => setToast(null)} aria-label="Dismiss" className="text-sm" style={{ color: "#fff", opacity: 0.7, flexShrink: 0 }}>&times;</button>
+        </div>
       )}
     </div>
   );
