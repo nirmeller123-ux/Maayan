@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { NAVY, MUTED, BORDER, BG } from "../lib/constants";
+import MicButton from "./MicButton";
 import { toISO, addDays, parseISO } from "../lib/dateUtils";
 import {
   fetchCanvasDay, saveCanvasDay, fetchCanvasFiles, addCanvasFileRow,
@@ -32,6 +33,7 @@ export default function CanvasView() {
   const [color, setColor] = useState(SWATCHES[0]);
   const [erasing, setErasing] = useState(false);
   const [brush, setBrush] = useState(3);
+  const [speechLang, setSpeechLang] = useState("he-IL");
 
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
@@ -126,6 +128,12 @@ export default function CanvasView() {
       try { await saveCanvasDay(dateRef.current, { notes: v }); setStatus("Saved"); }
       catch { setStatus("Save failed"); }
     }, 800);
+  }
+
+  function appendNote(text) {
+    const cur = notesRef.current || "";
+    const joined = cur ? `${cur}${/\s$/.test(cur) ? "" : " "}${text}` : text;
+    onNotesChange(joined);
   }
 
   function scheduleSketchSave() {
@@ -276,7 +284,15 @@ export default function CanvasView() {
         {/* Notes + attachments (first on mobile, so writing sits above the sketch) */}
         <div className="flex flex-col gap-5 order-1 md:order-none">
           <div className="flex flex-col">
-            <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: MUTED }}>Notes &amp; thoughts</div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: MUTED }}>Notes &amp; thoughts</div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setSpeechLang((l) => (l === "he-IL" ? "en-US" : "he-IL"))} className="text-xs px-2 py-1 rounded-full" style={{ border: `1px solid ${BORDER}`, color: NAVY }} title="Dictation language">
+                  {speechLang === "he-IL" ? "עב" : "EN"}
+                </button>
+                <MicButton onText={appendNote} lang={speechLang} title="Dictate into notes" label="Dictate" />
+              </div>
+            </div>
             <textarea
               value={notes}
               onChange={(e) => onNotesChange(e.target.value)}
