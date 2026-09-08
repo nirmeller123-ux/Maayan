@@ -14,6 +14,7 @@ export default function MicButton({ onText, onFinish, lang = "he-IL", title = "S
   const recRef = useRef(null);
   const acc = useRef("");
   const processed = useRef(0); // # of final results already emitted this session
+  const lastEmit = useRef(""); // last emitted phrase, to drop consecutive dupes
 
   useEffect(() => () => { try { recRef.current?.stop(); } catch { /* noop */ } }, []);
 
@@ -30,20 +31,23 @@ export default function MicButton({ onText, onFinish, lang = "he-IL", title = "S
     rec.interimResults = true;
     acc.current = "";
     processed.current = 0;
+    lastEmit.current = "";
     rec.onresult = (e) => {
-      // Emit each finalized result exactly once. Some browsers re-deliver the
-      // same final result on later events; tracking processed.current (and only
-      // advancing past finals, breaking at the first interim) prevents the
-      // duplicate insertion that repeated a dictated phrase several times.
+      // Emit each finalized phrase once. Two mobile-browser quirks cause the
+      // dictated text to repeat: (1) the same final result is re-delivered on
+      // later events — handled by the processed cursor (only advance past
+      // finals, break at the first interim); (2) the same phrase is appended
+      // as a *new* final entry — handled by skipping a final identical to the
+      // one just emitted.
       for (let k = processed.current; k < e.results.length; k++) {
         const r = e.results[k];
         if (!r.isFinal) break;
         processed.current = k + 1;
         const t = r[0].transcript.trim();
-        if (t) {
-          acc.current = acc.current ? `${acc.current} ${t}` : t;
-          onText && onText(t);
-        }
+        if (!t || t === lastEmit.current) continue;
+        lastEmit.current = t;
+        acc.current = acc.current ? `${acc.current} ${t}` : t;
+        onText && onText(t);
       }
     };
     rec.onend = () => {
