@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { NAVY, MUTED, BORDER, BG } from "../lib/constants";
 import MicButton from "./MicButton";
+import NotesEditor from "./NotesEditor";
 import { toISO, addDays, parseISO } from "../lib/dateUtils";
 import {
   fetchCanvasDay, saveCanvasDay, fetchCanvasFiles, addCanvasFileRow,
@@ -43,6 +44,7 @@ export default function CanvasView() {
   const sketchDirty = useRef(false);
   const notesTimer = useRef(null);
   const sketchTimer = useRef(null);
+  const pendingNotes = useRef(null); // latest notes value not yet confirmed saved
   const dateRef = useRef(date);
   const notesRef = useRef(notes);
   dateRef.current = date;
@@ -93,12 +95,16 @@ export default function CanvasView() {
 
   useEffect(() => { loadDay(date); }, [date, loadDay]);
 
-  // Best-effort save of notes when leaving the Canvas.
+  // Flush only genuinely-unsaved notes when leaving the Canvas. Guarding on
+  // pendingNotes avoids clobbering a saved value with a stale/empty one (e.g.
+  // React StrictMode's dev double-mount, or a quick remount).
   useEffect(() => {
     return () => {
       clearTimeout(notesTimer.current);
       clearTimeout(sketchTimer.current);
-      saveCanvasDay(dateRef.current, { notes: notesRef.current }).catch(() => {});
+      if (pendingNotes.current != null) {
+        saveCanvasDay(dateRef.current, { notes: pendingNotes.current }).catch(() => {});
+      }
     };
   }, []);
 
@@ -116,17 +122,22 @@ export default function CanvasView() {
         sketchDirty.current = false;
       }
       await saveCanvasDay(prev, patch);
+      pendingNotes.current = null;
     } catch { /* best effort */ }
     setDate(d);
   }
 
   function onNotesChange(v) {
     setNotes(v);
+    pendingNotes.current = v;
     setStatus("Saving…");
     clearTimeout(notesTimer.current);
     notesTimer.current = setTimeout(async () => {
-      try { await saveCanvasDay(dateRef.current, { notes: v }); setStatus("Saved"); }
-      catch { setStatus("Save failed"); }
+      try {
+        await saveCanvasDay(dateRef.current, { notes: v });
+        if (pendingNotes.current === v) pendingNotes.current = null;
+        setStatus("Saved");
+      } catch { setStatus("Save failed"); }
     }, 800);
   }
 
@@ -293,13 +304,7 @@ export default function CanvasView() {
                 <MicButton onText={appendNote} lang={speechLang} title="Dictate into notes" label="Dictate" />
               </div>
             </div>
-            <textarea
-              value={notes}
-              onChange={(e) => onNotesChange(e.target.value)}
-              placeholder="Write freely — anything on your mind today…"
-              className="border rounded-lg px-3 py-2 text-sm"
-              style={{ borderColor: BORDER, minHeight: 220, resize: "vertical", lineHeight: 1.5 }}
-            />
+            <NotesEditor value={notes} onChange={onNotesChange} placeholder="Write freely — thoughts, bullets, or check-boxes…" />
           </div>
 
           <div>

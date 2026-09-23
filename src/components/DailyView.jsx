@@ -74,8 +74,7 @@ export default function DailyView({ items, onSelectItem, refDate, setRefDate }) 
   const nextIso = toISO(addDays(refDate, 1));
   const isToday = selIso === toISO(new Date());
 
-  const { overdue, selected, next } = useMemo(() => {
-    const overdue = [];
+  const { selected, next } = useMemo(() => {
     const selected = [];
     const next = [];
     items.forEach((it) => {
@@ -83,19 +82,13 @@ export default function DailyView({ items, onSelectItem, refDate, setRefDate }) 
       // Span-aware: a multi-day item lands in the earliest bucket it covers.
       if (spanCovers(it, selIso)) selected.push(it);
       else if (spanCovers(it, nextIso)) next.push(it);
-      else if (it.due_date < selIso) {
-        // Completed work shouldn't nag from the overdue pile.
-        if (it.status === "Done") return;
-        overdue.push(it);
-      }
     });
-    overdue.sort(sortItems);
     selected.sort(sortItems);
     next.sort(sortItems);
-    return { overdue, selected, next };
+    return { selected, next };
   }, [items, selIso, nextIso]);
 
-  const total = overdue.length + selected.length + next.length;
+  const total = selected.length + next.length;
   const dayHolidays = useMemo(() => holidaysByDate(refDate, refDate)[selIso] || [], [selIso]); // eslint-disable-line react-hooks/exhaustive-deps
   const fmt = (iso, opts) => parseISO(iso).toLocaleDateString(undefined, opts);
   const selLabel = isToday ? "Due today" : `Due ${fmt(selIso, { weekday: "short", month: "short", day: "numeric" })}`;
@@ -146,11 +139,10 @@ export default function DailyView({ items, onSelectItem, refDate, setRefDate }) 
 
       {total === 0 ? (
         <div className="text-sm py-8 text-center" style={{ color: MUTED }}>
-          Nothing overdue, due {isToday ? "today" : "this day"}, or the next day. 🎉
+          Nothing due {isToday ? "today" : "this day"} or the next day. 🎉
         </div>
       ) : (
         <>
-          <Section title="Overdue" accent="#B3261E" items={overdue} onSelectItem={onSelectItem} />
           <Section title={selLabel} accent={NAVY} items={selected} onSelectItem={onSelectItem} />
           <Section title={nextLabel} accent="#2F855A" items={next} onSelectItem={onSelectItem} />
         </>

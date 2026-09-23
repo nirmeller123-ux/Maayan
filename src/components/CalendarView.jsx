@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { ItemPill, TaskDetailCard } from "./shared";
 import { segColor, segName, PRIORITIES, NAVY, MUTED, BORDER, BG, INK, HOLIDAY } from "../lib/constants";
 import { toISO, addDays, startOfWeek, buildMonthGrid, WEEKDAY_LABELS, parseTime, formatHour, eachDayISO } from "../lib/dateUtils";
@@ -21,6 +21,15 @@ function HolidayLabel({ names, size = 10 }) {
 function MonthGrid({ refDate, itemsByDate, interact, onSelectDate, holidays }) {
   const weeks = buildMonthGrid(refDate);
   const month = refDate.getMonth();
+  const todayIso = toISO(new Date());
+  const todayRef = useRef(null);
+
+  // When the month on screen contains today, scroll so the current week sits
+  // in the middle of the viewport (no hunting/scrolling to find today).
+  useEffect(() => {
+    if (todayRef.current) todayRef.current.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+  }, [refDate]);
+
   return (
     <div>
       <div className="grid grid-cols-7 gap-1 mb-1 text-xs font-medium" style={{ color: MUTED }}>
@@ -33,15 +42,20 @@ function MonthGrid({ refDate, itemsByDate, interact, onSelectDate, holidays }) {
           const iso = toISO(dt);
           const dayItems = itemsByDate[iso] || [];
           const outside = dt.getMonth() !== month;
+          const isToday = iso === todayIso;
           return (
             <div
               key={i}
+              ref={isToday ? todayRef : undefined}
               onClick={() => onSelectDate && onSelectDate(iso)}
               title="Open this day"
               className="rounded-lg p-2"
-              style={{ minHeight: 92, background: outside ? "#FAFAF8" : "#fff", border: "1px solid #EEEBE4", cursor: onSelectDate ? "pointer" : "default" }}
+              style={{ minHeight: 92, background: isToday ? `${NAVY}0D` : (outside ? "#FAFAF8" : "#fff"), border: isToday ? `2px solid ${NAVY}` : "1px solid #EEEBE4", cursor: onSelectDate ? "pointer" : "default" }}
             >
-              <div className="text-xs mb-1" style={{ color: outside ? "#B7B2A6" : MUTED }}>{dt.getDate()}</div>
+              <div className="text-xs mb-1 flex items-center gap-1" style={{ color: outside ? "#B7B2A6" : (isToday ? NAVY : MUTED), fontWeight: isToday ? 700 : 400 }}>
+                {dt.getDate()}
+                {isToday && <span style={{ fontSize: 9, background: NAVY, color: "#fff", borderRadius: 6, padding: "0 5px", fontWeight: 600 }}>today</span>}
+              </div>
               <HolidayLabel names={holidays[iso]} />
               {dayItems.slice(0, 3).map((it) => (
                 <ItemPill
@@ -67,20 +81,22 @@ function MonthGrid({ refDate, itemsByDate, interact, onSelectDate, holidays }) {
 function WeekGrid({ refDate, itemsByDate, interact, onSelectDate, holidays }) {
   const start = startOfWeek(refDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  const todayIso = toISO(new Date());
   return (
     <div className="grid grid-cols-7 gap-2">
       {days.map((dt, i) => {
         const iso = toISO(dt);
         const dayItems = itemsByDate[iso] || [];
+        const isToday = iso === todayIso;
         return (
           <div
             key={i}
             onClick={() => onSelectDate && onSelectDate(iso)}
             title="Open this day"
             className="rounded-lg p-2"
-            style={{ minHeight: 160, border: "1px solid #EEEBE4", cursor: onSelectDate ? "pointer" : "default" }}
+            style={{ minHeight: 160, border: isToday ? `2px solid ${NAVY}` : "1px solid #EEEBE4", background: isToday ? `${NAVY}0D` : "transparent", cursor: onSelectDate ? "pointer" : "default" }}
           >
-            <div className="text-xs font-medium mb-1" style={{ color: MUTED }}>{WEEKDAY_LABELS[i]} {dt.getDate()}</div>
+            <div className="text-xs font-medium mb-1" style={{ color: isToday ? NAVY : MUTED, fontWeight: isToday ? 700 : 500 }}>{WEEKDAY_LABELS[i]} {dt.getDate()}</div>
             <HolidayLabel names={holidays[iso]} />
             {dayItems.map((it) => (
               <ItemPill
