@@ -179,6 +179,12 @@ export default function App() {
     }
   }
 
+  // Set the same status on several standalone tasks at once (bulk action).
+  async function bulkUpdateTaskStatus(ids, status) {
+    await Promise.all(ids.map((id) => updateTask(id, { status })));
+    await loadAll();
+  }
+
   async function handleTaskSubmit(data) {
     const { id, ...patch } = data;
     if (id) {
@@ -296,6 +302,7 @@ export default function App() {
               setTimeFrame={setListTimeFrame}
               onSelectTask={openTask}
               onSelectProject={openProject}
+              onBulkStatus={bulkUpdateTaskStatus}
             />
           )}
           {view === "daily" && (

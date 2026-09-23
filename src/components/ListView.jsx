@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { SEGMENTS, PRIORITIES, segColor, segName, NAVY, MUTED, BORDER, BG } from "../lib/constants";
+import React, { useMemo, useState } from "react";
+import { SEGMENTS, PRIORITIES, STATUSES, segColor, segName, NAVY, MUTED, BORDER, BG } from "../lib/constants";
 import { PriorityBadge, StatusBadge } from "./shared";
 import { parseISO, toISO, addDays, startOfWeek, startOfMonth, formatTime } from "../lib/dateUtils";
 
@@ -42,7 +42,22 @@ export default function ListView({
   setTimeFrame,
   onSelectTask,
   onSelectProject,
+  onBulkStatus,
 }) {
+  const [selected, setSelected] = useState(() => new Set());
+  const [applying, setApplying] = useState(false);
+
+  function toggleSelect(id) {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+  function clearSelection() {
+    setSelected(new Set());
+  }
+
   function toggleSegment(id) {
     setActiveSegments((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
@@ -72,6 +87,22 @@ export default function ListView({
       }))
       .filter((p) => p.matchingTasks.length > 0 || noPriorityOrTimeFilter);
   }, [projects, activeSegments, activePriorities, timeFrame]);
+
+  const allVisibleSelected = filteredTasks.length > 0 && filteredTasks.every((t) => selected.has(t.id));
+  function toggleSelectAll() {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (filteredTasks.every((t) => n.has(t.id))) filteredTasks.forEach((t) => n.delete(t.id));
+      else filteredTasks.forEach((t) => n.add(t.id));
+      return n;
+    });
+  }
+  async function applyStatus(status) {
+    const ids = [...selected];
+    if (!ids.length) return;
+    setApplying(true);
+    try { await onBulkStatus(ids, status); } finally { setApplying(false); clearSelection(); }
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-4 md:p-6" style={{ border: `1px solid ${BORDER}` }}>
@@ -153,34 +184,70 @@ export default function ListView({
         ))}
       </div>
 
-      <div className="mb-3 text-xs font-semibold uppercase tracking-wide" style={{ color: MUTED }}>
-        Tasks ({filteredTasks.length})
+      <div className="flex items-center gap-2 mb-3">
+        {filteredTasks.length > 0 && (
+          <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} title="Select all tasks" style={{ accentColor: NAVY, width: 16, height: 16, cursor: "pointer" }} />
+        )}
+        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: MUTED }}>
+          Tasks ({filteredTasks.length})
+        </div>
       </div>
+
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3 p-2 rounded-lg" style={{ background: `${NAVY}0D`, border: `1px solid ${NAVY}` }}>
+          <span className="text-sm font-medium" style={{ color: NAVY }}>{selected.size} selected</span>
+          <span className="text-xs" style={{ color: MUTED }}>Set to:</span>
+          {STATUSES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              disabled={applying}
+              onClick={() => applyStatus(s)}
+              className="text-xs px-3 py-1 rounded-full font-medium"
+              style={{ border: `1px solid ${BORDER}`, background: "#fff", color: NAVY, opacity: applying ? 0.6 : 1 }}
+            >
+              {s}
+            </button>
+          ))}
+          <button type="button" onClick={clearSelection} className="text-xs px-3 py-1 rounded-full ml-auto" style={{ color: MUTED }}>Clear</button>
+        </div>
+      )}
+
       <div className="space-y-2">
         {filteredTasks.length === 0 && (
           <div className="text-sm py-4" style={{ color: MUTED }}>No tasks match these filters.</div>
         )}
-        {filteredTasks.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => onSelectTask(t)}
-            className="w-full text-left rounded-lg p-3 flex items-center gap-3"
-            style={{ border: "1px solid #EEEBE4", background: "#fff" }}
-          >
-            <span style={{ width: 10, height: 10, borderRadius: 9999, background: segColor(t.segment), flexShrink: 0 }} />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate" style={{ textDecoration: t.status === "Done" ? "line-through" : "none" }}>{t.title}</div>
-              <div className="text-xs" style={{ color: MUTED }}>
-                {segName(t.segment)} · due {t.due_date}{formatTime(t.start_time) ? ` · ${formatTime(t.start_time)}` : ""} · {t.hours}h
-              </div>
+        {filteredTasks.map((t) => {
+          const isSel = selected.has(t.id);
+          return (
+            <div
+              key={t.id}
+              className="w-full rounded-lg p-3 flex items-center gap-3"
+              style={{ border: `1px solid ${isSel ? NAVY : "#EEEBE4"}`, background: isSel ? `${NAVY}08` : "#fff" }}
+            >
+              <input
+                type="checkbox"
+                checked={isSel}
+                onChange={() => toggleSelect(t.id)}
+                aria-label={`Select ${t.title}`}
+                style={{ accentColor: NAVY, width: 16, height: 16, cursor: "pointer", flexShrink: 0 }}
+              />
+              <button type="button" onClick={() => onSelectTask(t)} className="flex-1 min-w-0 flex items-center gap-3 text-left">
+                <span style={{ width: 10, height: 10, borderRadius: 9999, background: segColor(t.segment), flexShrink: 0 }} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate" style={{ textDecoration: t.status === "Done" ? "line-through" : "none" }}>{t.title}</div>
+                  <div className="text-xs" style={{ color: MUTED }}>
+                    {segName(t.segment)} · due {t.due_date}{formatTime(t.start_time) ? ` · ${formatTime(t.start_time)}` : ""} · {t.hours}h
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <StatusBadge status={t.status} />
+                  <PriorityBadge priority={t.priority} />
+                </div>
+              </button>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <StatusBadge status={t.status} />
-              <PriorityBadge priority={t.priority} />
-            </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
