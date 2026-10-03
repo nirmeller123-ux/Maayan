@@ -3,14 +3,15 @@ import { SEGMENTS, PRIORITIES, STATUSES, NAVY, BORDER, MUTED } from "../lib/cons
 import { toISO, addDays, timeInputValue } from "../lib/dateUtils";
 import RangePicker from "./RangePicker";
 
-export default function AddTaskForm({ mode = "create", initialTask, onCancel, onSubmit, onDelete }) {
+export default function AddTaskForm({ mode = "create", initialTask, defaultDate, onCancel, onSubmit, onDelete }) {
+  // For a new task, default the date to the view's context day (Daily/Canvas)
+  // when provided, else a week out; and default the start time to 9:00 AM.
+  const newDate = defaultDate || toISO(addDays(new Date(), 7));
   const [title, setTitle] = useState(initialTask ? initialTask.title : "");
-  const [dueDate, setDueDate] = useState(initialTask ? initialTask.due_date : toISO(addDays(new Date(), 7)));
+  const [dueDate, setDueDate] = useState(initialTask ? initialTask.due_date : newDate);
   // start_date makes a task multi-day; default to the same day as due (single day).
-  const [startDate, setStartDate] = useState(
-    initialTask ? (initialTask.start_date || initialTask.due_date) : toISO(addDays(new Date(), 7))
-  );
-  const [startTime, setStartTime] = useState(initialTask ? timeInputValue(initialTask.start_time) : "");
+  const [startDate, setStartDate] = useState(initialTask ? (initialTask.start_date || initialTask.due_date) : newDate);
+  const [startTime, setStartTime] = useState(initialTask ? timeInputValue(initialTask.start_time) : "09:00");
   const [priority, setPriority] = useState(initialTask ? initialTask.priority : "Medium");
   const [status, setStatus] = useState(initialTask ? initialTask.status || "Not Started" : "Not Started");
   const [hours, setHours] = useState(initialTask ? initialTask.hours : 1);

@@ -25,8 +25,7 @@ function canvasToBlob(c) {
 
 // A per-day workspace: free writing, a free-hand sketch, and file attachments.
 // Everything is keyed by the selected date, so any day can be revisited.
-export default function CanvasView() {
-  const [date, setDate] = useState(toISO(new Date()));
+export default function CanvasView({ date, setDate }) {
   const [notes, setNotes] = useState("");
   const [files, setFiles] = useState([]);
   const [status, setStatus] = useState("");

@@ -10,7 +10,7 @@ import AddTaskForm from "./components/AddTaskForm";
 import AddProjectForm from "./components/AddProjectForm";
 import Modal from "./components/Modal";
 import { SEGMENTS, PRIORITIES, NAVY, BG, INK, BORDER } from "./lib/constants";
-import { parseISO } from "./lib/dateUtils";
+import { parseISO, toISO } from "./lib/dateUtils";
 import {
   fetchTasks, fetchProjects, createTask, createProject,
   updateTask, deleteTask, updateProject, deleteProject,
@@ -33,6 +33,7 @@ export default function App() {
   const [calRefDate, setCalRefDate] = useState(new Date());
 
   const [dailyRefDate, setDailyRefDate] = useState(new Date());
+  const [canvasDate, setCanvasDate] = useState(() => toISO(new Date()));
 
   const [voiceLang, setVoiceLang] = useState("he-IL");
   const [toast, setToast] = useState(null); // { text, onUndo? }
@@ -268,6 +269,7 @@ export default function App() {
           <AddTaskForm
             mode={taskEditor === "new" ? "create" : "edit"}
             initialTask={taskEditor === "new" ? null : taskEditor}
+            defaultDate={view === "daily" ? toISO(dailyRefDate) : view === "canvas" ? canvasDate : undefined}
             onCancel={() => setTaskEditor(null)}
             onSubmit={handleTaskSubmit}
             onDelete={handleDeleteTask}
@@ -317,7 +319,7 @@ export default function App() {
           {view === "pie" && (
             <PieView items={allItems} period={period} setPeriod={setPeriod} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />
           )}
-          {view === "canvas" && <CanvasView />}
+          {view === "canvas" && <CanvasView date={canvasDate} setDate={setCanvasDate} />}
         </>
       )}
 
