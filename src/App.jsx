@@ -32,8 +32,9 @@ export default function App() {
   const [calGranularity, setCalGranularity] = useState("month");
   const [calRefDate, setCalRefDate] = useState(new Date());
 
+  // Shared "current day" used by both the Daily and Canvas views, so moving to
+  // a date in one carries over to the other.
   const [dailyRefDate, setDailyRefDate] = useState(new Date());
-  const [canvasDate, setCanvasDate] = useState(() => toISO(new Date()));
 
   const [voiceLang, setVoiceLang] = useState("he-IL");
   const [toast, setToast] = useState(null); // { text, onUndo? }
@@ -269,7 +270,7 @@ export default function App() {
           <AddTaskForm
             mode={taskEditor === "new" ? "create" : "edit"}
             initialTask={taskEditor === "new" ? null : taskEditor}
-            defaultDate={view === "daily" ? toISO(dailyRefDate) : view === "canvas" ? canvasDate : undefined}
+            defaultDate={view === "daily" || view === "canvas" ? toISO(dailyRefDate) : undefined}
             onCancel={() => setTaskEditor(null)}
             onSubmit={handleTaskSubmit}
             onDelete={handleDeleteTask}
@@ -319,7 +320,7 @@ export default function App() {
           {view === "pie" && (
             <PieView items={allItems} period={period} setPeriod={setPeriod} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />
           )}
-          {view === "canvas" && <CanvasView date={canvasDate} setDate={setCanvasDate} />}
+          {view === "canvas" && <CanvasView date={toISO(dailyRefDate)} setDate={(iso) => setDailyRefDate(parseISO(iso))} />}
         </>
       )}
 
