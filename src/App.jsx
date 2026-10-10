@@ -38,6 +38,7 @@ export default function App() {
 
   const [voiceLang, setVoiceLang] = useState("he-IL");
   const [toast, setToast] = useState(null); // { text, onUndo? }
+  const [gcal, setGcal] = useState({ connected: false });
 
   const [ganttActiveSegments, setGanttActiveSegments] = useState(SEGMENTS.map((s) => s.id));
 
@@ -73,6 +74,35 @@ export default function App() {
     const t = setTimeout(() => setToast(null), toast.onUndo ? 8000 : 4500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // Google Calendar connection status + handle the OAuth redirect-back.
+  useEffect(() => {
+    fetch("/api/google/status").then((r) => r.json()).then(setGcal).catch(() => {});
+    const p = new URLSearchParams(window.location.search);
+    const g = p.get("gcal");
+    if (g === "connected") {
+      setToast({ text: "Google Calendar connected ✓" });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (g === "error") {
+      setToast({ text: `Google connect failed (${p.get("reason") || "error"})` });
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  async function handleGcal() {
+    if (!gcal.connected) {
+      window.location.href = "/api/google/auth";
+      return;
+    }
+    if (!window.confirm("Disconnect Google Calendar? (Your tasks and the Renesance calendar stay; syncing just stops.)")) return;
+    try {
+      await fetch("/api/google/disconnect", { method: "POST" });
+      setGcal({ connected: false });
+      setToast({ text: "Google Calendar disconnected" });
+    } catch {
+      setToast({ text: "Couldn't disconnect" });
+    }
+  }
 
   const allItems = useMemo(() => {
     const standalone = tasks.map((t) => ({ ...t, kind: "task" }));
@@ -258,6 +288,7 @@ export default function App() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
+          <button onClick={handleGcal} title={gcal.connected ? "Google Calendar connected — click to disconnect" : "Connect Google Calendar"} className="text-xs px-3 py-2 rounded-full font-medium" style={gcal.connected ? { background: `${NAVY}12`, color: NAVY, border: `1px solid ${NAVY}` } : { background: "#fff", color: NAVY, border: `1px solid ${BORDER}` }}>{gcal.connected ? "🗓 Google ✓" : "🗓 Connect Google"}</button>
           <button onClick={() => setVoiceLang((l) => (l === "he-IL" ? "en-US" : "he-IL"))} title="Voice language" className="text-xs px-2 py-2 rounded-full" style={{ border: `1px solid ${BORDER}`, color: NAVY }}>{voiceLang === "he-IL" ? "עב" : "EN"}</button>
           <MicButton onFinish={handleVoiceTranscript} lang={voiceLang} label="Voice task" title="Add a task by voice" />
           <button onClick={() => (taskEditor ? setTaskEditor(null) : openNewTask())} className="px-4 py-2 rounded-full text-sm font-medium" style={{ background: "#fff", border: `1px solid ${NAVY}`, color: NAVY }}>+ Add Task</button>
