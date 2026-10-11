@@ -62,6 +62,56 @@ export async function gcal(path, opts = {}, accessToken) {
   });
 }
 
+// --- task <-> event mapping -------------------------------------------------
+
+const SEG_COLOR = { family: "11", career: "9", ai: "3", income: "10", other: "8" };
+const pad = (n) => String(n).padStart(2, "0");
+function addDaysIso(iso, n) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+// Build a Google Calendar event body from a task. Timed tasks become timed
+// events sized by their `hours`; otherwise an all-day (optionally multi-day) event.
+export function taskToEvent(t) {
+  const desc = [];
+  if (t.segment) desc.push(`Segment: ${t.segment}`);
+  if (t.priority) desc.push(`Priority: ${t.priority}`);
+  if (t.status) desc.push(`Status: ${t.status}`);
+  const ev = {
+    summary: (t.status === "Done" ? "✓ " : "") + (t.title || "(untitled)"),
+    description: `${desc.join(" · ")}\n\n(Synced from Renesance — edit the task in the app)`,
+    colorId: SEG_COLOR[t.segment] || "8",
+    extendedProperties: { private: { taskId: String(t.id), source: "renesance" } },
+  };
+  if (t.start_time) {
+    const [h, mi] = String(t.start_time).split(":").map(Number);
+    const startMin = h * 60 + mi;
+    const durMin = Math.max(15, Math.round((Number(t.hours) || 1) * 60));
+    let endTotal = startMin + durMin;
+    const extraDays = Math.floor(endTotal / 1440);
+    endTotal %= 1440;
+    const endDate = extraDays > 0 ? addDaysIso(t.due_date, extraDays) : t.due_date;
+    ev.start = { dateTime: `${t.due_date}T${pad(h)}:${pad(mi)}:00`, timeZone: CAL_TIMEZONE };
+    ev.end = { dateTime: `${endDate}T${pad(Math.floor(endTotal / 60))}:${pad(endTotal % 60)}:00`, timeZone: CAL_TIMEZONE };
+  } else {
+    ev.start = { date: t.start_date || t.due_date };
+    ev.end = { date: addDaysIso(t.due_date, 1) }; // all-day end date is exclusive
+  }
+  return ev;
+}
+
+// Record that a task is synced to a given event (bookkeeping only — the trigger
+// won't treat this as a user edit).
+export async function markSynced(taskId, event) {
+  await admin()
+    .from("tasks")
+    .update({ gcal_event_id: event.id, gcal_updated: event.updated, gcal_synced_at: new Date().toISOString() })
+    .eq("id", taskId);
+}
+
 export function parseCookies(header) {
   const out = {};
   (header || "").split(";").forEach((c) => {
