@@ -5,6 +5,10 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://fkgxsjxtivlribwrfaik.supabase.co";
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Trimmed so a stray space/newline pasted into the Vercel env var can't break OAuth.
+export const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || "").trim();
+export const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
+
 export const APP_URL = "https://maayan-roan.vercel.app";
 export const REDIRECT_URI = `${APP_URL}/api/google/callback`;
 export const SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
@@ -37,8 +41,8 @@ export async function getAccessToken() {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
       refresh_token: sync.refresh_token,
       grant_type: "refresh_token",
     }),

@@ -1,4 +1,4 @@
-import { REDIRECT_URI, APP_URL, CAL_TIMEZONE, getSync, saveSync, parseCookies } from "../_google.js";
+import { REDIRECT_URI, APP_URL, CAL_TIMEZONE, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, getSync, saveSync, parseCookies } from "../_google.js";
 
 function back(res, q) {
   res.setHeader("Set-Cookie", "g_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0");
@@ -21,8 +21,8 @@ export default async function handler(req, res) {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
         redirect_uri: REDIRECT_URI,
         grant_type: "authorization_code",
       }),
