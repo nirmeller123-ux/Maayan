@@ -8,6 +8,11 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
+      // Don't let the service worker's SPA navigation fallback swallow /api/*
+      // routes (OAuth redirects etc.) — those must reach the server.
+      workbox: {
+        navigateFallbackDenylist: [/^\/api\//],
+      },
       manifest: {
         name: "Renesance",
         short_name: "Renesance",
