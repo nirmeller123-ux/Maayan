@@ -66,7 +66,7 @@ export async function gcal(path, opts = {}, accessToken) {
 
 const SEG_COLOR = { family: "11", career: "9", ai: "3", income: "10", other: "8" };
 const pad = (n) => String(n).padStart(2, "0");
-function addDaysIso(iso, n) {
+export function addDaysIso(iso, n) {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + n);
@@ -101,6 +101,41 @@ export function taskToEvent(t) {
     ev.end = { date: addDaysIso(t.due_date, 1) }; // all-day end date is exclusive
   }
   return ev;
+}
+
+// Build a task patch from a Google event that a user changed in Calendar.
+// Maps title + date/time/duration back. We only touch the fields the user can
+// meaningfully change in Calendar (title, when, how long) — segment/priority/
+// status stay owned by the app. Returns null for events we can't map.
+export function eventToTaskPatch(ev) {
+  const patch = {};
+  if (typeof ev.summary === "string") {
+    patch.title = ev.summary.replace(/^✓\s*/, "").trim() || "(untitled)";
+  }
+  if (ev.start?.dateTime) {
+    // Timed event. The dateTime string carries the wall-clock in the event's
+    // own timezone (e.g. "2026-10-20T09:00:00+03:00"); the date + HH:MM in that
+    // string are exactly what we want to store.
+    const m = String(ev.start.dateTime).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return null;
+    patch.due_date = m[1];
+    patch.start_time = `${m[2]}:${m[3]}`;
+    patch.start_date = null;
+    if (ev.end?.dateTime) {
+      const ms = new Date(ev.end.dateTime).getTime() - new Date(ev.start.dateTime).getTime();
+      if (ms > 0) patch.hours = Math.round((ms / 3600000) * 100) / 100;
+    }
+  } else if (ev.start?.date) {
+    // All-day (possibly multi-day). end.date is exclusive.
+    patch.start_time = null;
+    const s = ev.start.date;
+    const due = ev.end?.date ? addDaysIso(ev.end.date, -1) : s;
+    patch.due_date = due;
+    patch.start_date = s && s !== due ? s : null;
+  } else {
+    return null;
+  }
+  return patch;
 }
 
 // Record that a task is synced to a given event (bookkeeping only — the trigger

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ListView from "./components/ListView";
 import DailyView from "./components/DailyView";
 import CalendarView from "./components/CalendarView";
@@ -103,6 +103,34 @@ export default function App() {
       setToast({ text: "Couldn't disconnect" });
     }
   }
+
+  // One run of the two-way sync. Guarded so overlapping triggers (interval +
+  // after-edit nudge) don't pile up. Reloads tasks afterwards so anything pulled
+  // from Google shows up.
+  const syncingRef = useRef(false);
+  const syncGcal = useCallback(async ({ reload = true } = {}) => {
+    if (!gcal.connected || syncingRef.current) return;
+    syncingRef.current = true;
+    try {
+      await fetch("/api/google/sync", { method: "POST" });
+    } catch {
+      // timeouts/offline — the next tick catches up
+    } finally {
+      syncingRef.current = false;
+    }
+    if (reload) loadAll();
+  }, [gcal.connected, loadAll]);
+
+  // Automatic sync while connected: once on connect/load, every 2 minutes, and
+  // whenever the window regains focus (e.g. coming back from the Calendar app).
+  useEffect(() => {
+    if (!gcal.connected) return;
+    syncGcal();
+    const id = setInterval(() => syncGcal(), 120000);
+    const onFocus = () => syncGcal();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(id); window.removeEventListener("focus", onFocus); };
+  }, [gcal.connected, syncGcal]);
 
   const allItems = useMemo(() => {
     const standalone = tasks.map((t) => ({ ...t, kind: "task" }));
@@ -215,6 +243,7 @@ export default function App() {
   async function bulkUpdateTaskStatus(ids, status) {
     await Promise.all(ids.map((id) => updateTask(id, { status })));
     await loadAll();
+    syncGcal({ reload: false });
   }
 
   async function handleTaskSubmit(data) {
@@ -226,6 +255,7 @@ export default function App() {
     }
     setTaskEditor(null);
     await loadAll();
+    syncGcal({ reload: false });
   }
 
   async function handleDeleteTask(id) {
