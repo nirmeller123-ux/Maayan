@@ -183,6 +183,34 @@ export async function saveCanvasDay(date, patch) {
   if (error) throw error;
 }
 
+// Canvas lists: several titled lists per day, plus general (date-null) lists.
+export async function fetchCanvasLists(date) {
+  let q = supabase.from("canvas_lists").select("*");
+  q = date == null ? q.is("date", null) : q.eq("date", date);
+  const { data, error } = await q.order("position").order("created_at");
+  if (error) throw error;
+  return data;
+}
+
+export async function createCanvasList(row) {
+  const { data, error } = await supabase.from("canvas_lists").insert(row).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCanvasList(id, patch) {
+  const { error } = await supabase
+    .from("canvas_lists")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteCanvasList(id) {
+  const { error } = await supabase.from("canvas_lists").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function fetchCanvasFiles(date) {
   const { data, error } = await supabase
     .from("canvas_files")

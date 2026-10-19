@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { NAVY, MUTED, BORDER, BG } from "../lib/constants";
-import MicButton from "./MicButton";
-import NotesEditor from "./NotesEditor";
+import CanvasLists from "./CanvasLists";
 import { toISO, addDays, parseISO } from "../lib/dateUtils";
 import {
   fetchCanvasDay, saveCanvasDay, fetchCanvasFiles, addCanvasFileRow,
@@ -26,7 +25,6 @@ function canvasToBlob(c) {
 // A per-day workspace: free writing, a free-hand sketch, and file attachments.
 // Everything is keyed by the selected date, so any day can be revisited.
 export default function CanvasView({ date, setDate }) {
-  const [notes, setNotes] = useState("");
   const [files, setFiles] = useState([]);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
@@ -34,6 +32,7 @@ export default function CanvasView({ date, setDate }) {
   const [erasing, setErasing] = useState(false);
   const [brush, setBrush] = useState(3);
   const [speechLang, setSpeechLang] = useState("he-IL");
+  const [scope, setScope] = useState("day"); // "day" | "general"
 
   const canvasRef = useRef(null);
   const ctxRef = useRef(null);
@@ -41,13 +40,9 @@ export default function CanvasView({ date, setDate }) {
   const last = useRef(null);
   const undo = useRef([]);
   const sketchDirty = useRef(false);
-  const notesTimer = useRef(null);
   const sketchTimer = useRef(null);
-  const pendingNotes = useRef(null); // latest notes value not yet confirmed saved
   const dateRef = useRef(date);
-  const notesRef = useRef(notes);
   dateRef.current = date;
-  notesRef.current = notes;
 
   // Set up the 2D context once.
   useEffect(() => {
@@ -69,7 +64,6 @@ export default function CanvasView({ date, setDate }) {
     try {
       const [day, fl] = await Promise.all([fetchCanvasDay(d), fetchCanvasFiles(d)]);
       if (dateRef.current !== d) return;
-      setNotes(day?.notes || "");
       setFiles(fl || []);
       const ctx = ctxRef.current;
       if (ctx) {
@@ -94,56 +88,27 @@ export default function CanvasView({ date, setDate }) {
 
   useEffect(() => { loadDay(date); }, [date, loadDay]);
 
-  // Flush only genuinely-unsaved notes when leaving the Canvas. Guarding on
-  // pendingNotes avoids clobbering a saved value with a stale/empty one (e.g.
-  // React StrictMode's dev double-mount, or a quick remount).
+  // Flush an unsaved sketch when leaving the Canvas. (Notes/lists save
+  // themselves inside CanvasLists.)
   useEffect(() => {
     return () => {
-      clearTimeout(notesTimer.current);
       clearTimeout(sketchTimer.current);
-      if (pendingNotes.current != null) {
-        saveCanvasDay(dateRef.current, { notes: pendingNotes.current }).catch(() => {});
-      }
     };
   }, []);
 
   async function flushThen(d) {
-    clearTimeout(notesTimer.current);
     clearTimeout(sketchTimer.current);
     const prev = dateRef.current;
     try {
-      const patch = { notes: notesRef.current };
       if (sketchDirty.current && canvasRef.current) {
         const blob = await canvasToBlob(canvasRef.current);
         const path = `sketches/${prev}.png`;
         await uploadCanvasObject(path, blob, "image/png");
-        patch.sketch_path = path;
+        await saveCanvasDay(prev, { sketch_path: path });
         sketchDirty.current = false;
       }
-      await saveCanvasDay(prev, patch);
-      pendingNotes.current = null;
     } catch { /* best effort */ }
     setDate(d);
-  }
-
-  function onNotesChange(v) {
-    setNotes(v);
-    pendingNotes.current = v;
-    setStatus("Saving…");
-    clearTimeout(notesTimer.current);
-    notesTimer.current = setTimeout(async () => {
-      try {
-        await saveCanvasDay(dateRef.current, { notes: v });
-        if (pendingNotes.current === v) pendingNotes.current = null;
-        setStatus("Saved");
-      } catch { setStatus("Save failed"); }
-    }, 800);
-  }
-
-  function appendNote(text) {
-    const cur = notesRef.current || "";
-    const joined = cur ? `${cur}${/\s$/.test(cur) ? "" : " "}${text}` : text;
-    onNotesChange(joined);
   }
 
   function scheduleSketchSave() {
@@ -294,16 +259,16 @@ export default function CanvasView({ date, setDate }) {
         {/* Notes + attachments (first on mobile, so writing sits above the sketch) */}
         <div className="flex flex-col gap-5 order-1 md:order-none">
           <div className="flex flex-col">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: MUTED }}>Notes &amp; thoughts</div>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setSpeechLang((l) => (l === "he-IL" ? "en-US" : "he-IL"))} className="text-xs px-2 py-1 rounded-full" style={{ border: `1px solid ${BORDER}`, color: NAVY }} title="Dictation language">
-                  {speechLang === "he-IL" ? "עב" : "EN"}
-                </button>
-                <MicButton onText={appendNote} lang={speechLang} title="Dictate into notes" label="Dictate" />
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <div className="flex items-center gap-1 rounded-full p-0.5" style={{ border: `1px solid ${BORDER}` }}>
+                <button type="button" onClick={() => setScope("day")} className="text-xs px-3 py-1 rounded-full font-medium" style={scope === "day" ? { background: NAVY, color: "#fff" } : { color: NAVY }}>This day</button>
+                <button type="button" onClick={() => setScope("general")} className="text-xs px-3 py-1 rounded-full font-medium" style={scope === "general" ? { background: NAVY, color: "#fff" } : { color: NAVY }}>General</button>
               </div>
+              <button type="button" onClick={() => setSpeechLang((l) => (l === "he-IL" ? "en-US" : "he-IL"))} className="text-xs px-2 py-1 rounded-full" style={{ border: `1px solid ${BORDER}`, color: NAVY }} title="Dictation language">
+                {speechLang === "he-IL" ? "עב" : "EN"}
+              </button>
             </div>
-            <NotesEditor value={notes} onChange={onNotesChange} placeholder="Write freely — thoughts, bullets, or check-boxes…" />
+            <CanvasLists date={scope === "general" ? null : date} speechLang={speechLang} />
           </div>
 
           <div>

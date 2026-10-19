@@ -95,6 +95,17 @@ export default function NotesEditor({ value, onChange, placeholder }) {
     commit(lines.map((x) => (x.id === id ? { ...x, type: next, done: false } : x)), id);
   }
 
+  // Bulk actions over the whole list.
+  const hasText = lines.some((l) => l.text.trim() !== "");
+  const todos = lines.filter((l) => l.type === "todo");
+  function checkboxAll() {
+    // Turn every non-empty line into a checkbox (leave blank lines alone).
+    commit(lines.map((l) => (l.text.trim() === "" ? l : { ...l, type: "todo" })));
+  }
+  function setAllDone(done) {
+    commit(lines.map((l) => (l.type === "todo" ? { ...l, done } : l)));
+  }
+
   function onKeyDown(e, idx) {
     const l = lines[idx];
     if (e.key === "Enter") {
@@ -120,9 +131,13 @@ export default function NotesEditor({ value, onChange, placeholder }) {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
         <button type="button" onClick={() => toggleType("bullet")} className="text-xs px-2.5 py-1 rounded-full" style={{ border: `1px solid ${BORDER}`, color: NAVY }}>• Bullet</button>
         <button type="button" onClick={() => toggleType("todo")} className="text-xs px-2.5 py-1 rounded-full" style={{ border: `1px solid ${BORDER}`, color: NAVY }}>☐ Checkbox</button>
+        <span style={{ width: 1, height: 16, background: BORDER }} />
+        <button type="button" onClick={checkboxAll} disabled={!hasText} title="Turn every line into a checkbox" className="text-xs px-2.5 py-1 rounded-full disabled:opacity-40" style={{ border: `1px solid ${BORDER}`, color: NAVY }}>☐ All lines</button>
+        <button type="button" onClick={() => setAllDone(true)} disabled={!todos.length} title="Check every box" className="text-xs px-2.5 py-1 rounded-full disabled:opacity-40" style={{ border: `1px solid ${BORDER}`, color: NAVY }}>✓ Check all</button>
+        <button type="button" onClick={() => setAllDone(false)} disabled={!todos.length} title="Uncheck every box" className="text-xs px-2.5 py-1 rounded-full disabled:opacity-40" style={{ border: `1px solid ${BORDER}`, color: NAVY }}>▢ Uncheck all</button>
       </div>
       <div className="border rounded-lg px-3 py-2" style={{ borderColor: BORDER, minHeight: 220 }}>
         {lines.map((l, idx) => (
