@@ -4,6 +4,16 @@ import MicButton from "./MicButton";
 import NotesEditor from "./NotesEditor";
 import { fetchCanvasLists, createCanvasList, updateCanvasList, deleteCanvasList } from "../lib/api";
 
+// Turn a Supabase error into a short, useful message. The common one right now
+// is the table not existing yet (migration not run).
+function describe(e) {
+  const code = e?.code || "";
+  if (code === "PGRST205" || /canvas_lists/.test(e?.message || "")) {
+    return "Lists aren't set up on the database yet — run the canvas_lists migration in Supabase.";
+  }
+  return "Couldn't save — check your connection.";
+}
+
 // One list card: an optional title and a NotesEditor body, each debounced-saved
 // independently. Flushes any pending save if it unmounts (e.g. day/scope change
 // or removal), so nothing in-flight is lost.
@@ -70,16 +80,18 @@ function ListCard({ list, onPatch, onRemove, speechLang }) {
 export default function CanvasLists({ date, speechLang }) {
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
   const dateRef = useRef(date);
   dateRef.current = date;
 
   const load = useCallback(async (d) => {
     setLoading(true);
+    setErr("");
     try {
       const data = await fetchCanvasLists(d);
       if (dateRef.current === d) setLists(data || []);
-    } catch {
-      if (dateRef.current === d) setLists([]);
+    } catch (e) {
+      if (dateRef.current === d) { setLists([]); setErr(describe(e)); }
     } finally {
       if (dateRef.current === d) setLoading(false);
     }
@@ -88,8 +100,13 @@ export default function CanvasLists({ date, speechLang }) {
   useEffect(() => { load(date); }, [date, load]);
 
   async function addList() {
-    const row = await createCanvasList({ date: date ?? null, title: null, body: "", position: lists.length });
-    setLists((l) => [...l, row]);
+    setErr("");
+    try {
+      const row = await createCanvasList({ date: date ?? null, title: null, body: "", position: lists.length });
+      setLists((l) => [...l, row]);
+    } catch (e) {
+      setErr(describe(e));
+    }
   }
 
   const patchList = useCallback(async (id, patch) => {
@@ -119,6 +136,7 @@ export default function CanvasLists({ date, speechLang }) {
       <button type="button" onClick={addList} className="text-xs px-3 py-1.5 rounded-full font-medium self-start" style={{ background: NAVY, color: "#fff" }}>
         + Add list
       </button>
+      {err && <div className="text-xs" style={{ color: "#B3261E" }}>{err}</div>}
     </div>
   );
 }
