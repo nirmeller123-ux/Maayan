@@ -91,6 +91,44 @@ export function eachDayISO(startIso, endIso) {
   return out;
 }
 
+// Add n calendar months, clamping the day to the target month's last day
+// (so Jan 31 + 1 month -> Feb 28/29, not an overflow into March).
+export function addMonths(dt, n) {
+  const target = new Date(dt.getFullYear(), dt.getMonth() + n, 1);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(dt.getDate(), lastDay));
+  return target;
+}
+
+// Expand a recurring task into concrete occurrences, preserving the original
+// start..due span length on each. freq: 'daily'|'weekly'|'biweekly'|'monthly'.
+// Occurrences run from the first date up to (and including) untilIso. Capped so
+// a bad range can't create a runaway number of rows.
+export function recurrenceOccurrences(startIso, dueIso, freq, untilIso) {
+  const first = { start_date: startIso, due_date: dueIso };
+  if (!freq || freq === "none" || !untilIso) return [first];
+  const spanDays = Math.max(0, Math.round((parseISO(dueIso) - parseISO(startIso)) / 86400000));
+  const origin = parseISO(startIso);
+  const until = parseISO(untilIso);
+  // Each occurrence is computed from the origin (not the previous one) so that a
+  // monthly series anchors to the original day-of-month each month, clamping per
+  // month (Jan 31 -> Feb 28 -> Mar 31), rather than drifting.
+  const at = (k) => {
+    if (freq === "daily") return addDays(origin, k);
+    if (freq === "weekly") return addDays(origin, k * 7);
+    if (freq === "biweekly") return addDays(origin, k * 14);
+    if (freq === "monthly") return addMonths(origin, k);
+    return null;
+  };
+  const out = [];
+  for (let k = 0; k < 366; k++) {
+    const occStart = at(k);
+    if (!occStart || occStart > until) break;
+    out.push({ start_date: toISO(occStart), due_date: toISO(addDays(occStart, spanDays)) });
+  }
+  return out.length ? out : [first];
+}
+
 // Whether an item's day-span (start_date..due_date) covers a given ISO date.
 // A missing start_date means the item lives only on its due_date.
 export function spanCovers(item, iso) {

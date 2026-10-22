@@ -5,15 +5,17 @@ import CalendarView from "./components/CalendarView";
 import GanttView from "./components/GanttView";
 import PieView from "./components/PieView";
 import CanvasView from "./components/CanvasView";
+import LearningView from "./components/LearningView";
 import MicButton from "./components/MicButton";
 import AddTaskForm from "./components/AddTaskForm";
 import AddProjectForm from "./components/AddProjectForm";
 import Modal from "./components/Modal";
 import { SEGMENTS, PRIORITIES, NAVY, BG, INK, BORDER } from "./lib/constants";
-import { parseISO, toISO } from "./lib/dateUtils";
+import { parseISO, toISO, recurrenceOccurrences } from "./lib/dateUtils";
 import {
   fetchTasks, fetchProjects, createTask, createProject,
   updateTask, deleteTask, updateProject, deleteProject,
+  createRecurringTasks, deleteRecurringSeries,
   subscribeToChanges,
 } from "./lib/api";
 
@@ -247,9 +249,18 @@ export default function App() {
   }
 
   async function handleTaskSubmit(data) {
-    const { id, ...patch } = data;
+    const { id, recurrence, ...patch } = data;
     if (id) {
       await updateTask(id, patch);
+    } else if (recurrence && recurrence.freq && recurrence.freq !== "none") {
+      const occ = recurrenceOccurrences(patch.start_date, patch.due_date, recurrence.freq, recurrence.until);
+      const { start_date, due_date, ...base } = patch; // dates come from each occurrence
+      const rows = await createRecurringTasks(base, occ, recurrence.freq);
+      setTaskEditor(null);
+      await loadAll();
+      syncGcal({ reload: false });
+      setToast({ text: `Added ${rows.length} repeating “${patch.title}” tasks` });
+      return;
     } else {
       await createTask(patch);
     }
@@ -262,6 +273,13 @@ export default function App() {
     await deleteTask(id);
     setTaskEditor(null);
     await loadAll();
+  }
+
+  async function handleDeleteSeries(recurrenceId) {
+    await deleteRecurringSeries(recurrenceId);
+    setTaskEditor(null);
+    await loadAll();
+    setToast({ text: "Deleted the repeating series" });
   }
 
   async function handleProjectSubmit(data) {
@@ -306,7 +324,7 @@ export default function App() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
         <div className="flex flex-wrap gap-2">
-          {[["list", "Overview"], ["daily", "Daily"], ["calendar", "Calendar"], ["gantt", "Gantt"], ["pie", "Time Allocation"], ["canvas", "Canvas"]].map(([key, label]) => (
+          {[["list", "Overview"], ["daily", "Daily"], ["calendar", "Calendar"], ["gantt", "Gantt"], ["pie", "Time Allocation"], ["canvas", "Canvas"], ["learning", "Learning"]].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setView(key)}
@@ -335,6 +353,7 @@ export default function App() {
             onCancel={() => setTaskEditor(null)}
             onSubmit={handleTaskSubmit}
             onDelete={handleDeleteTask}
+            onDeleteSeries={handleDeleteSeries}
           />
         </Modal>
       )}
@@ -382,6 +401,9 @@ export default function App() {
             <PieView items={allItems} period={period} setPeriod={setPeriod} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />
           )}
           {view === "canvas" && <CanvasView date={toISO(dailyRefDate)} setDate={(iso) => setDailyRefDate(parseISO(iso))} />}
+          {view === "learning" && (
+            <LearningView tasks={tasks} voiceLang={voiceLang} setToast={setToast} reloadTasks={loadAll} />
+          )}
         </>
       )}
 

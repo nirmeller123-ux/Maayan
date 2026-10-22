@@ -1,9 +1,17 @@
 import React, { useState } from "react";
 import { SEGMENTS, PRIORITIES, STATUSES, NAVY, BORDER, MUTED } from "../lib/constants";
-import { toISO, addDays, timeInputValue } from "../lib/dateUtils";
+import { toISO, addDays, parseISO, timeInputValue } from "../lib/dateUtils";
 import RangePicker from "./RangePicker";
 
-export default function AddTaskForm({ mode = "create", initialTask, defaultDate, onCancel, onSubmit, onDelete }) {
+const REPEATS = [
+  { id: "none", label: "Doesn't repeat" },
+  { id: "daily", label: "Daily" },
+  { id: "weekly", label: "Weekly" },
+  { id: "biweekly", label: "Every 2 weeks" },
+  { id: "monthly", label: "Monthly" },
+];
+
+export default function AddTaskForm({ mode = "create", initialTask, defaultDate, onCancel, onSubmit, onDelete, onDeleteSeries }) {
   // For a new task, default the date to the view's context day (Daily/Canvas)
   // when provided, else a week out; and default the start time to 9:00 AM.
   const newDate = defaultDate || toISO(addDays(new Date(), 7));
@@ -16,6 +24,8 @@ export default function AddTaskForm({ mode = "create", initialTask, defaultDate,
   const [status, setStatus] = useState(initialTask ? initialTask.status || "Not Started" : "Not Started");
   const [hours, setHours] = useState(initialTask ? initialTask.hours : 1);
   const [segment, setSegment] = useState(initialTask ? initialTask.segment : SEGMENTS[0].id);
+  const [repeat, setRepeat] = useState("none");
+  const [until, setUntil] = useState(toISO(addDays(parseISO(newDate), 90)));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -34,9 +44,21 @@ export default function AddTaskForm({ mode = "create", initialTask, defaultDate,
         status,
         hours: Number(hours) || 0,
         segment,
+        recurrence: mode === "create" && repeat !== "none" ? { freq: repeat, until } : null,
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteSeries() {
+    const n = "this entire repeating series";
+    if (!window.confirm(`Delete ${n}? Every occurrence will be removed. This can't be undone.`)) return;
+    setDeleting(true);
+    try {
+      await onDeleteSeries(initialTask.recurrence_id);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -99,11 +121,39 @@ export default function AddTaskForm({ mode = "create", initialTask, defaultDate,
         </select>
       </div>
 
+      {mode === "create" && (
+        <>
+          <div className="md:col-span-3">
+            <label className={fieldLabel} style={{ color: MUTED }}>Repeats</label>
+            <select value={repeat} onChange={(e) => setRepeat(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }}>
+              {REPEATS.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            </select>
+          </div>
+          {repeat !== "none" && (
+            <div className="md:col-span-3">
+              <label className={fieldLabel} style={{ color: MUTED }}>Repeat until</label>
+              <input type="date" value={until} min={dueDate} onChange={(e) => setUntil(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" style={{ borderColor: BORDER }} />
+            </div>
+          )}
+        </>
+      )}
+
+      {mode === "edit" && initialTask?.recurrence_id && (
+        <div className="md:col-span-6 text-xs rounded-lg px-3 py-2" style={{ background: "#F6F4F0", color: MUTED }}>
+          🔁 Part of a repeating series ({initialTask.recurrence_rule || "recurring"}). Saving changes updates only this occurrence.
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 md:col-span-6">
-        <div>
+        <div className="flex gap-2">
           {mode === "edit" && (
             <button type="button" onClick={handleDelete} disabled={deleting} className="px-4 py-2 rounded-full text-sm" style={{ border: "1px solid #B3261E", color: "#B3261E", opacity: deleting ? 0.6 : 1 }}>
               {deleting ? "Deleting…" : "Delete Task"}
+            </button>
+          )}
+          {mode === "edit" && initialTask?.recurrence_id && onDeleteSeries && (
+            <button type="button" onClick={handleDeleteSeries} disabled={deleting} className="px-4 py-2 rounded-full text-sm" style={{ border: "1px solid #B3261E", color: "#B3261E", opacity: deleting ? 0.6 : 1 }}>
+              Delete series
             </button>
           )}
         </div>
